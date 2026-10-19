@@ -232,11 +232,17 @@ async function load(){
   try{
     const data=await adminApi("/admin/draft?starts_on="+encodeURIComponent(date));
     if(token!==loadCounter||date!==$("start").value)return;
-    const d=data.found?data.draft:null;draftVersion=data.version||0;
+    let d=data.found?data.draft:null;draftVersion=data.version||0;
+    if(!d&&date==="2026-10-18"){
+      const seedResponse=await fetch("./edition-one.json",{cache:"no-store"});
+      if(!seedResponse.ok)throw Error("Edition 1 catalogue unavailable");
+      d=await seedResponse.json();
+      if(token!==loadCounter||date!==$("start").value)return;
+    }
     rows=Array.from({length:10},(_,i)=>({...blank(),...(d?.albums?.[i]||{})}));
     light={...blank(),...(d?.limelight||{})};
     $("addLight").checked=!!d?.limelight;draw();updateDates();
-    $("status").textContent=d?"Cloud draft loaded · version "+draftVersion+".":"New edition — no cloud draft yet.";
+    $("status").textContent=data.found?"Cloud draft loaded · version "+draftVersion+".":d?"Edition 1 loaded from the live website. Click Save draft to Cloudflare to store it in your editor.":"New edition — no cloud draft yet.";
   }catch(e){if(token===loadCounter){$("status").textContent="Could not load cloud draft: "+e.message;updateDates()}}
 }
 async function generateNotes(button){
