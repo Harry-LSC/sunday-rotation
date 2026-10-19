@@ -192,6 +192,12 @@ async function adminDraft(request,url,db,listener){
 
 
 
+async function adminMembers(db,listener){
+  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+  const result=await db.prepare("SELECT display_name FROM listeners ORDER BY created_at DESC LIMIT 5000").all();
+  return reply({members:(result.results||[]).map(x=>x.display_name)});
+}
+
 async function recordLibrary(request,db,listener){
   if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
   await suggestionSchema(db);
@@ -316,6 +322,7 @@ export default {
         if(!listener)res=error("Authentication required",401);
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
+        else if(u.pathname==="/admin/members"&&request.method==="GET")res=await adminMembers(env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
         else if(u.pathname==="/admin/library"&&["GET","POST"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
