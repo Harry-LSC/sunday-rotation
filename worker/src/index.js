@@ -62,6 +62,65 @@ async function score(id,db,listener){
   const r=await db.prepare("SELECT COUNT(*) AS count,ROUND(AVG(score),2) AS average FROM journal_entries WHERE album_id=? AND status='rated' AND score IS NOT NULL").bind(id).first();
   return reply({available:true,album_id:id,count:r.count,average:r.average});
 }
+
+const ADMIN_LISTENER_ID="1379921535";
+async function suggestionSchema(db){
+  await db.prepare(`CREATE TABLE IF NOT EXISTS suggested_albums (
+    suggestion_id TEXT PRIMARY KEY,
+    album_key TEXT NOT NULL UNIQUE,
+    artist TEXT NOT NULL,
+    album TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK(status IN ('pending','shortlisted','dismissed','featured')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS suggestion_contributors (
+    suggestion_id TEXT NOT NULL,
+    listener_id TEXT NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(suggestion_id,listener_id)
+  )`).run();
+}
+const albumKey=(a,b)=>[a,b].map(s=>s.normalize("NFKC").toLowerCase().trim().replace(/[^\\p{L}\\p{N}]+/gu," ")).join("::");
+async function submitSuggestion(data,db,listener){
+  const artist=typeof data?.artist==="string"?data.artist.trim():"";
+  const album=typeof data?.album==="string"?data.album.trim():"";
+  const reason=typeof data?.reason==="string"?data.reason.trim():"";
+  if(artist.length<2||artist.length>120||album.length<1||album.length>180||reason.length>700)return error("Please check artist, album and optional reason");
+  await suggestionSchema(db);
+  const count=await db.prepare("SELECT COUNT(*) AS n FROM suggestion_contributors WHERE listener_id=? AND created_at >= datetime('now','-1 day')").bind(listener.listener_id).first();
+  if(Number(count?.n||0)>=5)return error("Five suggestions per day maximum. Please try tomorrow.",429);
+  const key=albumKey(artist,album);
+  let existing=await db.prepare("SELECT suggestion_id FROM suggested_albums WHERE album_key=?").bind(key).first();
+  if(!existing){
+    const id=crypto.randomUUID();
+    await db.prepare("INSERT OR IGNORE INTO suggested_albums(suggestion_id,album_key,artist,album) VALUES(?,?,?,?)").bind(id,key,artist,album).run();
+    existing=await db.prepare("SELECT suggestion_id FROM suggested_albums WHERE album_key=?").bind(key).first();
+  }
+  const r=await db.prepare("INSERT OR IGNORE INTO suggestion_contributors(suggestion_id,listener_id,reason) VALUES(?,?,?)").bind(existing.suggestion_id,listener.listener_id,reason||null).run();
+  return reply({saved:true,already_suggested:!r.meta?.changes,suggestion_id:existing.suggestion_id});
+}
+async function adminSuggestions(request,url,db,listener){
+  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+  await suggestionSchema(db);
+  if(request.method==="GET"){
+    const list=await db.prepare(`SELECT a.suggestion_id,a.artist,a.album,a.status,a.created_at,
+      COUNT(c.listener_id) AS supporters
+      FROM suggested_albums a LEFT JOIN suggestion_contributors c ON c.suggestion_id=a.suggestion_id
+      GROUP BY a.suggestion_id ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'shortlisted' THEN 1 ELSE 2 END,a.created_at DESC LIMIT 500`).all();
+    return reply({suggestions:list.results||[]});
+  }
+  if(request.method==="PUT"){
+    const data=await parse(request);
+    if(!["pending","shortlisted","dismissed","featured"].includes(data?.status)||typeof data.suggestion_id!=="string")return error("Invalid moderation request");
+    await db.prepare("UPDATE suggested_albums SET status=?,updated_at=CURRENT_TIMESTAMP WHERE suggestion_id=?").bind(data.status,data.suggestion_id).run();
+    return reply({saved:true});
+  }
+  return error("Method not allowed",405);
+}
+
 export default {
   async fetch(request,env){
     const origin=request.headers.get("Origin");
@@ -83,6 +142,8 @@ export default {
         const listener=await authenticated(request,env.DB);
         if(!listener)res=error("Authentication required",401);
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
+        else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
+        else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
         else if(u.pathname==="/journal"&&request.method==="DELETE")res=await deleteRating(u.searchParams.get("album_id"),env.DB,listener);
         else if(u.pathname==="/club-score"&&request.method==="GET")res=await score(u.searchParams.get("album_id"),env.DB,listener);
