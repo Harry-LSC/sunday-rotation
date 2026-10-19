@@ -126,6 +126,70 @@ async function adminSuggestions(request,url,db,listener){
   return error("Method not allowed",405);
 }
 
+
+const EDITION_START=Date.UTC(2026,9,18);
+function editionNumberFromDate(date){
+  if(typeof date!=="string"||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date))return null;
+  const d=new Date(date+"T12:00:00Z");
+  if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date||d.getUTCDay()!==0)return null;
+  const n=(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())-EDITION_START)/604800000;
+  return Number.isInteger(n)&&n>=0&&n<520?1+n:null;
+}
+async function editionsSchema(db){
+  await db.prepare(`CREATE TABLE IF NOT EXISTS studio_drafts(
+    starts_on TEXT PRIMARY KEY,
+    edition_number INTEGER NOT NULL,
+    payload_json TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+}
+function scrubRecord(record){
+  if(!record||typeof record!=="object"||Array.isArray(record))throw Error("Invalid album data");
+  const result={};
+  const fields=["artist","album","genre","cover_url","source_url","metadata_source","listen_when","listen_for","why_here","description"];
+  for(const k of fields){const v=record[k]??"";if(typeof v!=="string"||v.length>4000)throw Error("Invalid album field: "+k);result[k]=v.trim()}
+  for(const k of ["year","minutes","track_count"]){const v=record[k]??null;if(v!==null&&(!Number.isFinite(v)||v<0||v>100000))throw Error("Invalid "+k);result[k]=v}
+  const id=record.catalog_id??null;
+  if(id!==null&&(typeof id!=="string"&&typeof id!=="number"||String(id).length>80))throw Error("Invalid catalogue ID");
+  result.catalog_id=id;
+  return result;
+}
+function validateEditionDraft(payload,date){
+  if(!payload||payload.starts_on!==date||!Array.isArray(payload.albums)||payload.albums.length!==10)throw Error("Exactly ten album slots are required");
+  const albums=payload.albums.map(scrubRecord);
+  const limelight=payload.limelight==null?null:scrubRecord(payload.limelight);
+  return {format:"sunday-rotation-edition-preview-v1",starts_on:date,edition_number:editionNumberFromDate(date),albums,limelight};
+}
+async function adminDraft(request,url,db,listener){
+  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+  const date=url.searchParams.get("starts_on");
+  const number=editionNumberFromDate(date);
+  if(number===null)return error("Choose a valid Sunday on or after 18 October 2026");
+  await editionsSchema(db);
+  if(request.method==="GET"){
+    const found=await db.prepare("SELECT payload_json,version,updated_at FROM studio_drafts WHERE starts_on=?").bind(date).first();
+    return reply(found?{found:true,draft:JSON.parse(found.payload_json),version:found.version,updated_at:found.updated_at}:{found:false,version:0});
+  }
+  if(request.method==="PUT"){
+    const input=await parse(request);
+    if(!Number.isSafeInteger(input?.expected_version)||input.expected_version<0)return error("Missing draft version");
+    const draft=validateEditionDraft(input.draft,date);
+    const raw=JSON.stringify(draft);
+    if(raw.length>100000)return error("Edition exceeds storage limit",413);
+    const current=await db.prepare("SELECT version FROM studio_drafts WHERE starts_on=?").bind(date).first();
+    if((current?.version||0)!==input.expected_version)return error("This draft changed on another device. Reload it before saving.",409);
+    if(current){
+      const result=await db.prepare("UPDATE studio_drafts SET payload_json=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE starts_on=? AND version=?").bind(raw,date,input.expected_version).run();
+      if(!result.meta?.changes)return error("Draft changed while saving. Reload and retry.",409);
+    }else{
+      await db.prepare("INSERT INTO studio_drafts(starts_on,edition_number,payload_json,version) VALUES(?,?,?,1)").bind(date,number,raw).run();
+    }
+    return reply({saved:true,version:input.expected_version+1,starts_on:date});
+  }
+  return error("Method not allowed",405);
+}
+
 export default {
   async fetch(request,env){
     const origin=request.headers.get("Origin");
@@ -149,6 +213,7 @@ export default {
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
+        else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
         else if(u.pathname==="/journal"&&request.method==="DELETE")res=await deleteRating(u.searchParams.get("album_id"),env.DB,listener);
         else if(u.pathname==="/club-score"&&request.method==="GET")res=await score(u.searchParams.get("album_id"),env.DB,listener);
