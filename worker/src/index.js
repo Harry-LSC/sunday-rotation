@@ -110,7 +110,12 @@ async function adminSuggestions(request,url,db,listener){
       COUNT(c.listener_id) AS supporters
       FROM suggested_albums a LEFT JOIN suggestion_contributors c ON c.suggestion_id=a.suggestion_id
       GROUP BY a.suggestion_id ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'shortlisted' THEN 1 ELSE 2 END,a.created_at DESC LIMIT 500`).all();
-    return reply({suggestions:list.results||[]});
+    const suggestions=list.results||[];
+    for(const item of suggestions){
+      const reasons=await db.prepare("SELECT c.reason,l.display_name FROM suggestion_contributors c JOIN listeners l ON l.listener_id=c.listener_id WHERE c.suggestion_id=? AND c.reason IS NOT NULL AND LENGTH(TRIM(c.reason))>0 ORDER BY c.created_at ASC LIMIT 30").bind(item.suggestion_id).all();
+      item.reasons=(reasons.results||[]).map(r=>({reason:r.reason,listener_name:r.display_name}));
+    }
+    return reply({suggestions});
   }
   if(request.method==="PUT"){
     const data=await parse(request);
