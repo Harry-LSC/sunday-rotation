@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Sunday Rotation — Edition Studio Preview</title>
-<style>.generateNotes{background:var(--green);color:white;border-color:var(--green);font-size:13px}.generationMessage{font-size:13px;color:var(--green);margin:6px 0 12px;min-height:18px}</style><style>
+<style>.genre-board{border:1px solid var(--line);padding:16px;background:#f8f5ee;margin:12px 0 20px}.genre-board p{margin:8px 0 12px}.genre-lights{display:flex;flex-wrap:wrap;gap:7px}.genre-light{font-size:12px;border:1px solid #c5c5bd;border-radius:20px;padding:6px 11px;color:#757c76;background:#eae9e2}.genre-light.lit{background:#285b49;border-color:#285b49;color:white}.genre-light.repeated{background:#a85a39;border-color:#a85a39;color:white}</style><style>.generateNotes{background:var(--green);color:white;border-color:var(--green);font-size:13px}.generationMessage{font-size:13px;color:var(--green);margin:6px 0 12px;min-height:18px}</style><style>
 .admin-gate[hidden]{display:none!important}.admin-gate{min-height:100dvh;display:grid;place-items:center;padding:18px;background:#f2eee5}
 .admin-login{width:min(100%,490px);border:1px solid var(--line);background:#f8f5ee;padding:clamp(20px,5vw,38px)}
 .admin-login h1{font-size:clamp(35px,7vw,49px)}.admin-login p{font-size:14px}
@@ -27,7 +27,7 @@
 <p class="muted date" id="dateRange"></p>
 <div class="toolbar"><button id="past">← Previous draft</button><button id="future">Next draft →</button><button id="newDraft">Start fresh</button></div>
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
-<div id="cards"></div>
+<div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
 <div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
 <div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div>
@@ -126,9 +126,40 @@ function metadataCard(r,type,i){
   const details=r.metadata_source?'<strong>'+escapeHTML(r.artist)+' — '+escapeHTML(r.album)+'</strong><small>'+[r.year,r.minutes?r.minutes+' min':null,r.track_count?r.track_count+' tracks':null].filter(Boolean).join(' · ')+'</small>':'<small>Search for official album data and artwork.</small>';
   return '<div class="lookupbox"><div class="artsmall">'+art+'</div><div class="lookupdetails">'+details+'</div><button type="button" class="lookupButton" data-type="'+type+'" data-index="'+i+'">Find album</button></div><div id="results-'+id+'" class="lookupresults" aria-live="polite"></div>';
 }
+const genreGroups=[
+["Pop",/\b(pop|synthpop|art pop|electropop|dream pop|indie pop|k.pop)\b/i],
+["Rock",/\b(rock|punk|metal|grunge|shoegaze|alternative)\b/i],
+["Jazz",/\b(jazz|bebop|fusion|swing)\b/i],
+["Soul / R&B",/\b(soul|r&b|rnb|funk|motown)\b/i],
+["Hip-hop",/\b(hip.hop|rap|trap|grime)\b/i],
+["Electronic",/\b(electronic|ambient|techno|house|dance|idm|electronica)\b/i],
+["Folk / Country",/\b(folk|country|americana|bluegrass|singer.songwriter)\b/i],
+["Classical",/\b(classical|baroque|orchestral|chamber|opera)\b/i],
+["Global",/\b(world|afrobeat|latin|reggae|dub|bossa|flamenco)\b/i],
+["Experimental",/\b(experimental|avant.garde|noise|industrial)\b/i]
+];
+function genreGroup(label){
+ const value=String(label||"").trim();
+ return value?(genreGroups.find(([name,re])=>re.test(value))?.[0]||value):null;
+}
+function updateGenreLights(){
+ const active=rows.filter(r=>r.artist.trim()||r.album.trim()), counts=new Map();
+ active.map(r=>genreGroup(r.genre)).filter(Boolean).forEach(v=>counts.set(v,(counts.get(v)||0)+1));
+ const labels=[...new Set([...genreGroups.map(x=>x[0]),...counts.keys()])];
+ $("genreLights").replaceChildren();
+ labels.forEach(name=>{
+  const count=counts.get(name)||0, chip=document.createElement("span");
+  chip.className="genre-light"+(count?" lit":"")+(count>1?" repeated":"");
+  chip.textContent=name+(count>1?" ×"+count:"");
+  chip.title=count>1?"Genre repeated "+count+" times — allowed.":count?"Already represented.":"Not yet represented.";
+  $("genreLights").append(chip);
+ });
+ $("genreCount").textContent=active.length+" of 10 chosen";
+}
 function draw(){
   $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+'</div>'+metadataCard(r,"regular",i)+editorialFields(r,"regular",i)+'</div>').join("");
   $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+'</div>'+metadataCard(light,"light",0)+editorialFields(light,"light",0):"";
+  updateGenreLights();
 }
 function collect(){
   document.querySelectorAll("input[data-type]").forEach(el=>{const target=el.dataset.type==="light"?light:rows[+el.dataset.index];target[el.dataset.key]=el.value.trim()});
@@ -232,7 +263,7 @@ document.addEventListener("click",e=>{
   const button=e.target.closest?.(".generateNotes");
   if(button)generateNotes(button);
 });
-$("cards").addEventListener("input",collect);$("lightFields").addEventListener("input",collect);
+$("cards").addEventListener("input",()=>{collect();updateGenreLights()});$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
 $("save").onclick=async()=>{
