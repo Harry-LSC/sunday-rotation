@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Sunday Rotation — Edition Studio Preview</title>
-<style>
+<style>.generateNotes{background:var(--green);color:white;border-color:var(--green);font-size:13px}.generationMessage{font-size:13px;color:var(--green);margin:6px 0 12px;min-height:18px}</style><style>
 .admin-gate[hidden]{display:none!important}.admin-gate{min-height:100dvh;display:grid;place-items:center;padding:18px;background:#f2eee5}
 .admin-login{width:min(100%,490px);border:1px solid var(--line);background:#f8f5ee;padding:clamp(20px,5vw,38px)}
 .admin-login h1{font-size:clamp(35px,7vw,49px)}.admin-login p{font-size:14px}
@@ -117,7 +117,7 @@ const escapeHTML=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;"
 function field(label,value,type,i,k){return '<div><label for="'+type+'-'+i+'-'+k+'">'+label+'</label><input id="'+type+'-'+i+'-'+k+'" data-type="'+type+'" data-index="'+i+'" data-key="'+k+'" value="'+escapeHTML(value)+'" placeholder="'+(k==="artist"?"Artist name":k==="album"?"Album title":"Any genre")+'"></div>'}
 function editorialFields(r,type,i){
   const keys=[["description","Short album description"],["listen_when","Listen when"],["listen_for","Listen for"],["why_here","Why it is here"]];
-  return '<details class="editorial"><summary>Edit sleeve notes and description</summary>'+
+  return '<details class="editorial"><summary>Edit sleeve notes and description</summary><div class="actions"><button type="button" class="generateNotes" data-type="'+type+'" data-index="'+i+'">✦ Generate Sleeve Notes</button><span class="muted">AI first draft · check before saving</span></div><div class="generationMessage" aria-live="polite"></div>'+
     keys.map(([key,label])=>'<label for="note-'+type+'-'+i+'-'+key+'">'+label+'</label><textarea id="note-'+type+'-'+i+'-'+key+'" data-note-type="'+type+'" data-note-index="'+i+'" data-note-key="'+key+'" rows="2" placeholder="Write or edit before scheduling">'+escapeHTML(r[key]||"")+'</textarea>').join("")+'</details>';
 }
 function metadataCard(r,type,i){
@@ -208,6 +208,30 @@ async function load(){
     $("status").textContent=d?"Cloud draft loaded · version "+draftVersion+".":"New edition — no cloud draft yet.";
   }catch(e){if(token===loadCounter){$("status").textContent="Could not load cloud draft: "+e.message;updateDates()}}
 }
+async function generateNotes(button){
+  collect();
+  const type=button.dataset.type,index=Number(button.dataset.index);
+  const r=type==="light"?light:rows[index];
+  const msg=button.closest(".editorial").querySelector(".generationMessage");
+  if(!r.artist||!r.album){msg.textContent="Choose the artist and album first.";return}
+  const existing=["description","listen_when","listen_for","why_here"].some(k=>r[k]?.trim());
+  if(existing&&!confirm("Replace the four current editorial fields with a new AI draft? You can still cancel without saving to the cloud."))return;
+  const initial=button.textContent;button.disabled=true;button.textContent="Writing notes…";msg.textContent="Preparing a draft. This may take a moment.";
+  try{
+    const result=await adminApi("/admin/generate-notes","POST",{artist:r.artist,album:r.album,genre:r.genre,year:r.year});
+    ["description","listen_when","listen_for","why_here"].forEach(k=>{
+      r[k]=result.draft[k];
+      const field=document.getElementById("note-"+type+"-"+index+"-"+k);
+      if(field)field.value=r[k];
+    });
+    msg.textContent="Draft ready. Review and edit the notes, then Save draft to Cloudflare.";
+  }catch(e){msg.textContent="Generation unavailable: "+e.message}
+  finally{button.disabled=false;button.textContent=initial}
+}
+document.addEventListener("click",e=>{
+  const button=e.target.closest?.(".generateNotes");
+  if(button)generateNotes(button);
+});
 $("cards").addEventListener("input",collect);$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
