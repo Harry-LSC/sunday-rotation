@@ -50,6 +50,11 @@ async function journal(request,db,listener){
     .bind(listener.listener_id,id,status,score,mood,notes).run();
   return reply({saved:true,album_id:id});
 }
+async function deleteRating(id,db,listener){
+  if(!albums.has(id))return error("Unknown album");
+  const result=await db.prepare("DELETE FROM journal_entries WHERE listener_id=? AND album_id=?").bind(listener.listener_id,id).run();
+  return reply({deleted:true,album_id:id,changes:result.meta?.changes??0});
+}
 async function score(id,db,listener){
   if(!albums.has(id))return error("Unknown album");
   const mine=await db.prepare("SELECT score FROM journal_entries WHERE listener_id=? AND album_id=? AND status='rated' AND score IS NOT NULL").bind(listener.listener_id,id).first();
@@ -60,7 +65,7 @@ async function score(id,db,listener){
 export default {
   async fetch(request,env){
     const origin=request.headers.get("Origin");
-    const cors=origin===allowedOrigin?{"Access-Control-Allow-Origin":allowedOrigin,"Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization","Vary":"Origin"}:{};
+    const cors=origin===allowedOrigin?{"Access-Control-Allow-Origin":allowedOrigin,"Access-Control-Allow-Methods":"GET,POST,PUT,DELETE,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization","Vary":"Origin"}:{};
     if(request.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
     if(origin&&origin!==allowedOrigin)return error("Origin not allowed",403);
     let res;
@@ -76,6 +81,7 @@ export default {
         if(!listener)res=error("Authentication required",401);
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
+        else if(u.pathname==="/journal"&&request.method==="DELETE")res=await deleteRating(u.searchParams.get("album_id"),env.DB,listener);
         else if(u.pathname==="/club-score"&&request.method==="GET")res=await score(u.searchParams.get("album_id"),env.DB,listener);
         else res=error("Not found",404);
       }
