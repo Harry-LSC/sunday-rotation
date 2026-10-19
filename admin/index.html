@@ -2,7 +2,7 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Sunday Rotation — Edition Studio Preview</title>
 <style>
-.admin-gate{min-height:100dvh;display:grid;place-items:center;padding:18px;background:#f2eee5}
+.admin-gate[hidden]{display:none!important}.admin-gate{min-height:100dvh;display:grid;place-items:center;padding:18px;background:#f2eee5}
 .admin-login{width:min(100%,490px);border:1px solid var(--line);background:#f8f5ee;padding:clamp(20px,5vw,38px)}
 .admin-login h1{font-size:clamp(35px,7vw,49px)}.admin-login p{font-size:14px}
 #adminWorkspace[hidden]{display:none!important}
@@ -77,7 +77,19 @@ function renderSuggestions(items){
       catch(e){$("suggestionStatus").textContent="Could not save: "+e.message}
       finally{button.disabled=false}
     };
-    wrap.append(select,button);$("suggestionList").append(wrap);
+    if(Array.isArray(item.reasons)&&item.reasons.length){
+      const reasons=document.createElement("div");reasons.className="muted";
+      item.reasons.forEach(entry=>{const p=document.createElement("p");p.textContent="“"+entry.reason+"” — "+entry.listener_name;reasons.append(p)});
+      wrap.append(reasons);
+    }
+    const use=document.createElement("button");use.textContent="Add to current draft";
+    use.onclick=()=>{
+      const free=rows.findIndex(x=>!x.artist&&!x.album);
+      if(free<0){$("suggestionStatus").textContent="This draft already has ten albums. Open Editions and clear a slot first.";return}
+      rows[free].artist=item.artist;rows[free].album=item.album;
+      draw();showPanel("editions");$("status").textContent="Added to Album "+(free+1)+". Use Find album to retrieve the artwork, then save your draft.";
+    };
+    wrap.append(select,button,use);$("suggestionList").append(wrap);
   });
 }
 async function refreshSuggestions(){
