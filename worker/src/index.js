@@ -191,6 +191,61 @@ async function adminDraft(request,url,db,listener){
 }
 
 
+
+async function recordLibrary(request,db,listener){
+  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+  await suggestionSchema(db);
+  await editionsSchema(db);
+  await db.prepare(`CREATE TABLE IF NOT EXISTS library_albums (
+    library_id TEXT PRIMARY KEY, album_key TEXT NOT NULL UNIQUE,
+    artist TEXT NOT NULL, album TEXT NOT NULL, genre TEXT,
+    year INTEGER, note TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+  if(request.method==="POST"){
+    const input=await parse(request);
+    const artist=typeof input?.artist==="string"?input.artist.trim():"";
+    const album=typeof input?.album==="string"?input.album.trim():"";
+    const genre=typeof input?.genre==="string"?input.genre.trim():"";
+    const note=typeof input?.note==="string"?input.note.trim():"";
+    const year=input?.year==null||input.year===""?null:Number(input.year);
+    if(artist.length<2||artist.length>120||album.length<1||album.length>180||genre.length>120||note.length>1000||
+      (year!==null&&(!Number.isInteger(year)||year<1850||year>2200)))return error("Invalid library record");
+    const key=albumKey(artist,album);
+    await db.prepare("INSERT OR IGNORE INTO library_albums(library_id,album_key,artist,album,genre,year,note) VALUES(?,?,?,?,?,?,?)")
+      .bind(crypto.randomUUID(),key,artist,album,genre||null,year,note||null).run();
+    return reply({saved:true});
+  }
+  if(request.method!=="GET")return error("Method not allowed",405);
+  const [suggestions,manual,drafts]=await Promise.all([
+    db.prepare(`SELECT s.suggestion_id,s.artist,s.album,s.status,COUNT(c.listener_id) AS supporters
+      FROM suggested_albums s LEFT JOIN suggestion_contributors c ON c.suggestion_id=s.suggestion_id
+      GROUP BY s.suggestion_id LIMIT 1000`).all(),
+    db.prepare("SELECT library_id,artist,album,genre,year,note FROM library_albums ORDER BY created_at DESC LIMIT 1000").all(),
+    db.prepare("SELECT starts_on,edition_number,payload_json FROM studio_drafts ORDER BY starts_on LIMIT 520").all()
+  ]);
+  const all=new Map();
+  const add=(artist,album,extra)=>{
+    if(!artist||!album)return;
+    const key=albumKey(artist,album);
+    const entry=all.get(key)||{key,artist,album,genre:"",year:null,sources:[],editions:[],suggestion_status:null,supporters:0,note:""};
+    if(extra.genre&&!entry.genre)entry.genre=extra.genre;
+    if(extra.year&&!entry.year)entry.year=extra.year;
+    if(extra.note&&!entry.note)entry.note=extra.note;
+    if(extra.source&&!entry.sources.includes(extra.source))entry.sources.push(extra.source);
+    if(extra.edition&&!entry.editions.includes(extra.edition))entry.editions.push(extra.edition);
+    if(extra.status){entry.suggestion_status=extra.status;entry.supporters=extra.supporters||0}
+    all.set(key,entry);
+  };
+  for(const x of manual.results||[])add(x.artist,x.album,{...x,source:"Manual"});
+  for(const x of suggestions.results||[])add(x.artist,x.album,{source:"Suggestion",status:x.status,supporters:x.supporters});
+  for(const d of drafts.results||[]){
+    let obj;try{obj=JSON.parse(d.payload_json)}catch{continue}
+    for(const item of [...(Array.isArray(obj.albums)?obj.albums:[]),...(obj.limelight?[obj.limelight]:[])])
+      add(item.artist,item.album,{genre:item.genre,year:item.year,source:"Edition draft",edition:d.edition_number});
+  }
+  return reply({albums:[...all.values()],draft_count:(drafts.results||[]).length});
+}
+
 async function generateSleeveNotes(request,env,listener){
   if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
   const input=await parse(request);
@@ -262,6 +317,7 @@ export default {
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
+        else if(u.pathname==="/admin/library"&&["GET","POST"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
         else if(u.pathname==="/admin/generate-notes"&&request.method==="POST")res=await generateSleeveNotes(request,env,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
