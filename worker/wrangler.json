@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "sunday-rotation-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sunday-rotation-db",
+      "database_id": "83daad1f-0e0d-4f10-aa19-8daae94e662b"
+    }
+  ]
+}
