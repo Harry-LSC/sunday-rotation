@@ -19,6 +19,7 @@
 <button type="button" class="admin-tab active" data-panel="editions">Editions</button>
 <button type="button" class="admin-tab" data-panel="suggestions">Suggestions <span id="suggestionsCount"></span></button>
 <button type="button" class="admin-tab" data-panel="library">Record Library</button>
+<button type="button" class="admin-tab" data-panel="members">Members</button>
 <button type="button" class="admin-tab" data-panel="settings">Settings</button>
 </nav>
 <div class="admin-panel" id="panel-editions"><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
@@ -51,6 +52,12 @@
 <form id="libraryAdd"><div class="fields"><div><label>Artist<input name="artist" required maxlength="120"></label></div><div><label>Album<input name="album" required maxlength="180"></label></div><div><label>Genre<input name="genre" maxlength="120"></label></div><div><label>Year<input name="year" type="number" min="1850" max="2200"></label></div></div><div class="actions"><button class="primary" type="submit">Add to library</button></div></form></div>
 </section>
 <style>#libraryTable th,#libraryTable td{text-align:left;vertical-align:top;padding:10px 9px;border-bottom:1px solid var(--line)}#libraryTable th{position:sticky;top:0;background:#e9e5db}#libraryTable td button{font-size:12px;padding:5px 10px;min-height:34px}</style>
+<section class="admin-panel" id="panel-members" hidden>
+<div class="eyebrow">THE LISTENING CLUB</div><h1>Members.</h1>
+<p class="intro">Registered display names only. Private to the administrator.</p>
+<div id="membersStatus" class="muted" role="status">Open this tab to load members.</div>
+<div id="membersList" class="card" style="display:grid;gap:10px"></div>
+</section>
 <section class="admin-panel" id="panel-settings" hidden>
 <div class="eyebrow">ADMINISTRATION</div><h1>Studio settings.</h1>
 <div class="card"><h2>Publishing</h2><p class="muted">Planned weekly changeover: Sunday at 00:00 Europe/Berlin. Exactly ten regular albums; one optional Limelight album. An incomplete draft cannot be scheduled.</p><p class="muted">Future editions are hidden from listeners until their publication date. Previous editions stay accessible in the archive.</p></div>
@@ -228,6 +235,7 @@ function editionNumber(){
 }
 function showPanel(name){
   if(name==="library")refreshLibrary();
+  if(name==="members")refreshMembers();
   document.querySelectorAll(".admin-panel").forEach(p=>p.hidden=p.id!=="panel-"+name);
   document.querySelectorAll(".admin-tab").forEach(b=>{const active=b.dataset.panel===name;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});
   window.scrollTo(0,0);
@@ -373,4 +381,17 @@ $("libraryAdd").onsubmit=async e=>{
   catch(err){$("libraryStatus").textContent="Could not add record: "+err.message}
 };
 
+async function refreshMembers(){
+  $("membersStatus").textContent="Loading members…";
+  $("membersList").replaceChildren();
+  try{
+    const data=await adminApi("/admin/members");
+    const names=Array.isArray(data.members)?data.members:[];
+    $("membersStatus").textContent=names.length+" registered member"+(names.length===1?"":"s")+".";
+    for(const name of names){
+      const item=document.createElement("div");item.textContent=name;
+      $("membersList").append(item);
+    }
+  }catch(e){$("membersStatus").textContent="Could not load members: "+e.message}
+}
 </script></html>
