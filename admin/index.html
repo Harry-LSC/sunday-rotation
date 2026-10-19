@@ -18,6 +18,7 @@
 <nav class="admin-nav" aria-label="Admin sections">
 <button type="button" class="admin-tab active" data-panel="editions">Editions</button>
 <button type="button" class="admin-tab" data-panel="suggestions">Suggestions <span id="suggestionsCount"></span></button>
+<button type="button" class="admin-tab" data-panel="library">Record Library</button>
 <button type="button" class="admin-tab" data-panel="settings">Settings</button>
 </nav>
 <div class="admin-panel" id="panel-editions"><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
@@ -39,6 +40,17 @@
 <div id="suggestionStatus" role="status" class="muted">Loading…</div>
 <div id="suggestionList"></div>
 </section>
+
+<section class="admin-panel" id="panel-library" hidden>
+<div class="eyebrow">THE CLUB'S COLLECTION</div><h1>Record Library.</h1>
+<p class="intro">Your growing catalogue of listener suggestions, edition drafts and played albums. Suggestions remain in their own inbox. Nothing here publishes an edition.</p>
+<div class="toolbar"><input id="librarySearch" aria-label="Search records" placeholder="Search artist, album, genre or source" style="flex:2;min-width:180px"><select id="libraryFilter" aria-label="Filter records" style="flex:1;min-width:160px"><option value="">All records</option><option value="Published">Published</option><option value="Edition draft">Edition drafts</option><option value="Suggestion">Suggestions</option><option value="Manual">Manual additions</option></select><button type="button" id="libraryRefresh">Refresh ↻</button><button type="button" id="libraryExport">Export CSV ↓</button></div>
+<p id="libraryStatus" class="muted" role="status">Open this tab to load the catalogue.</p>
+<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px;background:#f8f5ee;font-size:13px" id="libraryTable"><thead><tr><th>Artist</th><th>Album</th><th>Genre</th><th>Year</th><th>Provenance</th><th>Edition(s)</th><th>Use</th></tr></thead><tbody id="libraryBody"></tbody></table></div>
+<div class="card"><h2>Add a record</h2><p class="muted">For curator discoveries not submitted by listeners. Artist and title are used to detect duplicates.</p>
+<form id="libraryAdd"><div class="fields"><div><label>Artist<input name="artist" required maxlength="120"></label></div><div><label>Album<input name="album" required maxlength="180"></label></div><div><label>Genre<input name="genre" maxlength="120"></label></div><div><label>Year<input name="year" type="number" min="1850" max="2200"></label></div></div><div class="actions"><button class="primary" type="submit">Add to library</button></div></form></div>
+</section>
+<style>#libraryTable th,#libraryTable td{text-align:left;vertical-align:top;padding:10px 9px;border-bottom:1px solid var(--line)}#libraryTable th{position:sticky;top:0;background:#e9e5db}#libraryTable td button{font-size:12px;padding:5px 10px;min-height:34px}</style>
 <section class="admin-panel" id="panel-settings" hidden>
 <div class="eyebrow">ADMINISTRATION</div><h1>Studio settings.</h1>
 <div class="card"><h2>Publishing</h2><p class="muted">Planned weekly changeover: Sunday at 00:00 Europe/Berlin. Exactly ten regular albums; one optional Limelight album. An incomplete draft cannot be scheduled.</p><p class="muted">Future editions are hidden from listeners until their publication date. Previous editions stay accessible in the archive.</p></div>
@@ -215,6 +227,7 @@ function editionNumber(){
   return weeks>=0?weeks+1:null;
 }
 function showPanel(name){
+  if(name==="library")refreshLibrary();
   document.querySelectorAll(".admin-panel").forEach(p=>p.hidden=p.id!=="panel-"+name);
   document.querySelectorAll(".admin-tab").forEach(b=>{const active=b.dataset.panel===name;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});
   window.scrollTo(0,0);
@@ -301,4 +314,63 @@ $("settingsImport").onchange=async event=>{
     draw();updateDates();showPanel("editions");$("status").textContent="Backup restored to this form. Choose Save draft to store it in Cloudflare.";
   }catch(e){$("settingsStatus").textContent="Could not restore: "+e.message}finally{event.target.value=""}
 };
+
+let libraryItems=[];
+function normalizeLibraryKey(artist,album){return [artist,album].map(s=>String(s||"").normalize("NFKC").toLowerCase().trim().replace(/[^\\p{L}\\p{N}]+/gu," ")).join("::")}
+async function refreshLibrary(){
+  $("libraryStatus").textContent="Loading records…";
+  try{
+    const [cloud,seed]=await Promise.all([
+      adminApi("/admin/library"),
+      fetch("./edition-one.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Edition 1 data missing");return r.json()})
+    ]);
+    const records=new Map((cloud.albums||[]).map(x=>[x.key,{...x}]));
+    for(const a of seed.albums||[]){
+      const key=normalizeLibraryKey(a.artist,a.album);
+      const x=records.get(key)||{key,artist:a.artist,album:a.album,genre:a.genre,year:a.year,sources:[],editions:[],suggestion_status:null,supporters:0};
+      x.sources=[...new Set([...x.sources,"Published"])];
+      x.editions=[...new Set([...x.editions,1])];
+      if(!x.genre)x.genre=a.genre;
+      if(!x.year)x.year=a.year;
+      records.set(key,x);
+    }
+    libraryItems=[...records.values()].sort((a,b)=>a.artist.localeCompare(b.artist)||a.album.localeCompare(b.album));
+    renderLibrary();
+  }catch(e){$("libraryStatus").textContent="Library could not load: "+e.message}
+}
+function renderLibrary(){
+  const q=$("librarySearch").value.trim().toLocaleLowerCase(),filter=$("libraryFilter").value;
+  const shown=libraryItems.filter(a=>(!filter||a.sources.includes(filter))&&
+    [a.artist,a.album,a.genre,(a.sources||[]).join(" ")].join(" ").toLocaleLowerCase().includes(q));
+  const body=$("libraryBody");body.replaceChildren();
+  for(const a of shown){
+    const row=document.createElement("tr");
+    const values=[a.artist,a.album,a.genre||"—",a.year||"—",(a.sources||[]).join(", ")+(a.suggestion_status?" · "+a.suggestion_status:""),(a.editions||[]).map(n=>"#"+n).join(", ")||"—"];
+    for(const v of values){const td=document.createElement("td");td.textContent=v;row.append(td)}
+    const td=document.createElement("td"),b=document.createElement("button");b.type="button";b.textContent="Add to draft";
+    b.onclick=()=>{
+      collect();const i=rows.findIndex(x=>!x.artist&&!x.album);
+      if(i<0){$("libraryStatus").textContent="Current draft has no empty slots. Clear one in Editions first.";return}
+      Object.assign(rows[i],{artist:a.artist,album:a.album,genre:a.genre||"",year:a.year||null});
+      draw();showPanel("editions");$("status").textContent="Added "+a.album+" to slot "+(i+1)+". Confirm metadata and save this edition.";
+    };
+    td.append(b);row.append(td);body.append(row);
+  }
+  $("libraryStatus").textContent=shown.length+" displayed · "+libraryItems.length+" unique records. Edition 1 is the live published selection; other edition numbers indicate saved drafts, not publication.";
+}
+$("librarySearch").oninput=renderLibrary;$("libraryFilter").onchange=renderLibrary;
+$("libraryRefresh").onclick=refreshLibrary;
+$("libraryExport").onclick=()=>{
+  const cells=[["Artist","Album","Genre","Year","Sources","Editions","Suggestion status","Supporters"],
+    ...libraryItems.map(a=>[a.artist,a.album,a.genre||"",a.year||"",(a.sources||[]).join("; "),(a.editions||[]).join("; "),a.suggestion_status||"",a.supporters||0])];
+  const csv=cells.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\\r\\n");
+  const url=URL.createObjectURL(new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");a.href=url;a.download="Sunday_Rotation_Record_Library.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+};
+$("libraryAdd").onsubmit=async e=>{
+  e.preventDefault();const form=e.currentTarget, data=Object.fromEntries(new FormData(form).entries());
+  try{await adminApi("/admin/library","POST",data);form.reset();await refreshLibrary()}
+  catch(err){$("libraryStatus").textContent="Could not add record: "+err.message}
+};
+
 </script></html>
