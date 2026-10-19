@@ -22,14 +22,14 @@
 </nav>
 <div class="admin-panel" id="panel-editions"><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
 <p class="intro">Ten records across any genres, with an optional eleventh in the Limelight. Build editions weeks ahead, then review everything before publishing.</p>
-<div class="alert"><strong>Preview only.</strong> This editor stores drafts in this browser, not Cloudflare. No admin authentication, automatic album lookup or publishing is enabled yet. Do not use it for confidential material.</div>
+<div class="alert"><strong>Cloud drafts enabled.</strong> Save and reopen drafts on authorised devices. Scheduling and publishing remain disabled; the public edition is unchanged.</div>
 <div class="toolbar"><label style="flex:1;min-width:190px">Edition start (Sunday)<input type="date" id="start" value="2026-10-25"></label><div style="flex:1;min-width:190px"><label>Edition number</label><div id="edition" style="min-height:43px;padding:11px;border:1px solid var(--line);background:#e9e5db;font-weight:700" aria-live="polite">02</div></div></div>
 <p class="muted date" id="dateRange"></p>
 <div class="toolbar"><button id="past">← Previous draft</button><button id="future">Next draft →</button><button id="newDraft">Start fresh</button></div>
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft on this device</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
+<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
 <div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div>
 </div>
 <section class="admin-panel" id="panel-suggestions" hidden>
@@ -99,13 +99,13 @@ async function refreshSuggestions(){
 $("refreshSuggestions").onclick=refreshSuggestions;
 $("adminLogin").onsubmit=async e=>{
   e.preventDefault();$("adminGateStatus").textContent="Checking access…";
-  try{await authenticateAdmin($("adminCredential").value.trim().toLowerCase());$("adminCredential").value=""}
+  try{await authenticateAdmin($("adminCredential").value.trim().toLowerCase());$("adminCredential").value="";await load()}
   catch(e){$("adminGateStatus").textContent="Access denied: "+e.message}
 };
 (async()=>{
   try{
     const saved=JSON.parse(localStorage.getItem("sunday-rotation-member-v1")||"null");
-    if(saved?.credential){await authenticateAdmin(saved.credential);return}
+    if(saved?.credential){await authenticateAdmin(saved.credential);await load();return}
     $("adminGateStatus").textContent="Enter your private recovery key to continue.";
   }catch(e){$("adminGateStatus").textContent="This browser isn't authorized. Enter your private recovery key."}
 })();
@@ -193,11 +193,33 @@ function editionKey(){return base+$("start").value}
 function getData(){collect();return {format:"sunday-rotation-edition-preview-v1",starts_on:$("start").value,edition_number:editionNumber(),albums:rows,limelight:$("addLight").checked?light:null}}
 function validSunday(){const d=new Date($("start").value+"T12:00:00Z");return !Number.isNaN(+d)&&d.getUTCDay()===0}
 function updateDates(){const number=editionNumber();$("edition").textContent=number===null?"—":String(number).padStart(2,"0");const d=new Date($("start").value+"T12:00:00Z");const end=new Date(+d+6*86400000);$("dateRange").textContent=validSunday()?("Scheduled week: "+$("start").value+" to "+end.toISOString().slice(0,10)):"Choose a Sunday as the start date."}
-function load(){try{const d=JSON.parse(localStorage.getItem(editionKey())||"null");rows=Array.from({length:10},(_,i)=>({...blank(),...(d?.albums?.[i]||{})}));light={...blank(),...(d?.limelight||{})};$("addLight").checked=!!d?.limelight;$("status").textContent=d?"Saved draft loaded from this browser.":"New draft — not saved.";draw();updateDates()}catch{$("status").textContent="Unable to read saved draft."}}
+let draftVersion=0,loadCounter=0;
+async function load(){
+  const token=++loadCounter,date=$("start").value;
+  if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
+  $("status").textContent="Loading cloud draft…";
+  try{
+    const data=await adminApi("/admin/draft?starts_on="+encodeURIComponent(date));
+    if(token!==loadCounter||date!==$("start").value)return;
+    const d=data.found?data.draft:null;draftVersion=data.version||0;
+    rows=Array.from({length:10},(_,i)=>({...blank(),...(d?.albums?.[i]||{})}));
+    light={...blank(),...(d?.limelight||{})};
+    $("addLight").checked=!!d?.limelight;draw();updateDates();
+    $("status").textContent=d?"Cloud draft loaded · version "+draftVersion+".":"New edition — no cloud draft yet.";
+  }catch(e){if(token===loadCounter){$("status").textContent="Could not load cloud draft: "+e.message;updateDates()}}
+}
 $("cards").addEventListener("input",collect);$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
-$("save").onclick=()=>{if(editionNumber()===null){$("status").textContent="Choose a Sunday on or after 18 October 2026.";return}try{localStorage.setItem(editionKey(),JSON.stringify(getData()));$("status").textContent="Draft saved on this browser only."}catch{$("status").textContent="Browser storage unavailable. Export a backup."}};
+$("save").onclick=async()=>{
+  if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
+  const button=$("save");button.disabled=true;$("status").textContent="Saving to Cloudflare…";
+  try{
+    const response=await adminApi("/admin/draft?starts_on="+encodeURIComponent($("start").value),"PUT",{expected_version:draftVersion,draft:getData()});
+    draftVersion=response.version;$("status").textContent="Saved to Cloudflare · version "+draftVersion+".";
+  }catch(e){$("status").textContent="Not saved: "+e.message}
+  finally{button.disabled=false}
+};
 $("download").onclick=()=>{const blob=new Blob([JSON.stringify(getData(),null,2)],{type:"application/json"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download="Sunday_Rotation_Edition_"+$("start").value+"_draft.json";a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};
 function shift(days){collect();const d=new Date($("start").value+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);$("start").value=d.toISOString().slice(0,10);load()}
 $("past").onclick=()=>shift(-7);$("future").onclick=()=>shift(7);
@@ -215,8 +237,7 @@ $("settingsImport").onchange=async event=>{
     rows=restored;light={...blank(),...(data.limelight||{})};
     $("start").value=data.starts_on;$("addLight").checked=!!data.limelight;
     if(editionNumber()===null)throw Error("Edition must begin on Sunday, 18 October 2026 or later");
-    draw();updateDates();showPanel("editions");$("status").textContent="Backup restored to this form. Choose Save draft to keep it on this browser.";
+    draw();updateDates();showPanel("editions");$("status").textContent="Backup restored to this form. Choose Save draft to store it in Cloudflare.";
   }catch(e){$("settingsStatus").textContent="Could not restore: "+e.message}finally{event.target.value=""}
 };
-load();
 </script></html>
