@@ -316,7 +316,7 @@ $("settingsImport").onchange=async event=>{
 };
 
 let libraryItems=[];
-function normalizeLibraryKey(artist,album){return [artist,album].map(s=>String(s||"").normalize("NFKC").toLowerCase().trim().replace(/[^\\p{L}\\p{N}]+/gu," ")).join("::")}
+function normalizeLibraryKey(artist,album){return [artist,album].map(s=>String(s||"").normalize("NFKC").toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu," ")).join("::")}
 async function refreshLibrary(){
   $("libraryStatus").textContent="Loading records…";
   try{
@@ -363,8 +363,8 @@ $("libraryRefresh").onclick=refreshLibrary;
 $("libraryExport").onclick=()=>{
   const cells=[["Artist","Album","Genre","Year","Sources","Editions","Suggestion status","Supporters"],
     ...libraryItems.map(a=>[a.artist,a.album,a.genre||"",a.year||"",(a.sources||[]).join("; "),(a.editions||[]).join("; "),a.suggestion_status||"",a.supporters||0])];
-  const csv=cells.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\\r\\n");
-  const url=URL.createObjectURL(new Blob(["\\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
+  const csv=cells.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+  const url=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}));
   const a=document.createElement("a");a.href=url;a.download="Sunday_Rotation_Record_Library.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
 };
 $("libraryAdd").onsubmit=async e=>{
