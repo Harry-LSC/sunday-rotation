@@ -10,5 +10,8 @@
       "database_name": "sunday-rotation-db",
       "database_id": "83daad1f-0e0d-4f10-aa19-8daae94e662b"
     }
-  ]
+  ],
+  "ai": {
+    "binding": "AI"
+  }
 }
