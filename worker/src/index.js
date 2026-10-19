@@ -68,7 +68,7 @@ export default {
       const u=new URL(request.url);
       if(u.pathname==="/health"&&request.method==="GET"){
         await env.DB.prepare("SELECT 1 FROM listeners LIMIT 1").first();
-        res=reply({ok:true,service:"sunday-rotation-api",database:"connected"});
+        res=reply({ok:true,service:"sunday-rotation-api",database:"connected",deployment_test:"github-auto-2026-10-19"});
       }else if(u.pathname==="/register"&&request.method==="POST"){
         res=await register(await parse(request),env.DB);
       }else{
