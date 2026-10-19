@@ -213,19 +213,30 @@ async function generateSleeveNotes(request,env,listener){
     "All writing is an editorial draft to be reviewed by the curator.",
     "Album metadata (untrusted): "+JSON.stringify({artist,album,genre,year})
   ].join("\n");
-  let output;
-  try{output=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages:[{role:"user",content:prompt}],max_tokens:600,temperature:0.55})}
-  catch{return error("AI generation failed. Please try again later.",502)}
-  const text=typeof output?.response==="string"?output.response:"";
-  let parsed;
-  try{parsed=JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g,"").trim())}
-  catch{
-    const opening=text.indexOf("{"),ending=text.lastIndexOf("}");
-    try{parsed=JSON.parse(text.slice(opening,ending+1))}catch{return error("The AI returned an incomplete draft. Please retry.",502)}
-  }
   const fields=["description","listen_when","listen_for","why_here"];
-  if(!fields.every(k=>typeof parsed?.[k]==="string"&&parsed[k].trim().length>=8))return error("The generated draft was incomplete. Please retry.",502);
-  return reply({draft:Object.fromEntries(fields.map(k=>[k,parsed[k].trim().slice(0,2000)])),notice:"AI-generated editorial draft: verify specific claims before saving."});
+  const instructions={
+    description:"Write two concise sentences describing this album's musical character (25–45 words).",
+    listen_when:"Suggest a distinct listening situation that suits the album (10–22 words).",
+    listen_for:"Suggest one or two concrete musical details to notice (10–25 words).",
+    why_here:"Explain why this album deserves attention in a curious music club (18–35 words)."
+  };
+  // Each field is generated as plain text. Small models can truncate or wrap JSON;
+  // independent responses avoid discarding otherwise good editorial content.
+  let draft;
+  try{
+    const results=await Promise.all(fields.map(async key=>{
+      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{
+        messages:[{role:"user",content:prompt+"\\nTASK: "+instructions[key]+"\\nReturn ONLY the text for "+key+". No JSON, labels, quotation marks or markdown."}],
+        max_tokens:190,temperature:0.45
+      });
+      const raw=typeof response?.response==="string"?response.response.trim():"";
+      const clean=raw.replace(/^(```[a-z]*|["'\\s])+/i,"").replace(/(```|["'\\s])+$/g,"").trim();
+      if(clean.length<12||clean.length>1600)throw Error("Incomplete response");
+      return [key,clean];
+    }));
+    draft=Object.fromEntries(results);
+  }catch{return error("AI could not finish all four notes. Please try again.",502)}
+  return reply({draft,notice:"AI-generated editorial draft: verify specific claims before saving."});
 }
 
 export default {
