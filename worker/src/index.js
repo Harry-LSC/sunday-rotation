@@ -83,7 +83,7 @@ async function suggestionSchema(db){
     PRIMARY KEY(suggestion_id,listener_id)
   )`).run();
 }
-const albumKey=(a,b)=>[a,b].map(s=>s.normalize("NFKC").toLowerCase().trim().replace(/[^\\p{L}\\p{N}]+/gu," ")).join("::");
+const albumKey=(a,b)=>[a,b].map(s=>s.normalize("NFKC").toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu," ")).join("::");
 async function submitSuggestion(data,db,listener){
   const artist=typeof data?.artist==="string"?data.artist.trim():"";
   const album=typeof data?.album==="string"?data.album.trim():"";
