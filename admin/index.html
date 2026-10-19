@@ -1,11 +1,17 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Sunday Rotation — Edition Studio Preview</title>
-<style>.lookupbox{display:flex;align-items:center;gap:12px;margin-top:13px;flex-wrap:wrap}.artsmall{width:54px;height:54px;flex:none;background:#e4ded4;display:grid;place-items:center}.artsmall img{width:100%;height:100%;object-fit:cover}.lookupdetails{display:flex;flex:1;min-width:125px;flex-direction:column;font-size:13px}.lookupdetails small,.match small{display:block;color:#67716c;font-size:12px}.lookupButton{font-size:13px}.lookupresults{margin-top:8px}.match-title{font-size:12px;color:#59645f;margin:10px 0}.match{width:100%;border-radius:3px;display:flex;align-items:center;text-align:left;gap:10px;margin:5px 0;background:#fffdf8;padding:7px}.match img{width:44px;height:44px;object-fit:cover}.match span:nth-child(2){flex:1;min-width:0}.match strong{font-size:13px}.match span:last-child{font-size:12px}</style><style>
+<style>.admin-nav{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:25px}.admin-tab{font-size:14px}.admin-tab.active{background:var(--green);color:white}.admin-panel[hidden]{display:none!important}.admin-panel{display:block}.card .status{font-size:14px}</style><style>.lookupbox{display:flex;align-items:center;gap:12px;margin-top:13px;flex-wrap:wrap}.artsmall{width:54px;height:54px;flex:none;background:#e4ded4;display:grid;place-items:center}.artsmall img{width:100%;height:100%;object-fit:cover}.lookupdetails{display:flex;flex:1;min-width:125px;flex-direction:column;font-size:13px}.lookupdetails small,.match small{display:block;color:#67716c;font-size:12px}.lookupButton{font-size:13px}.lookupresults{margin-top:8px}.match-title{font-size:12px;color:#59645f;margin:10px 0}.match{width:100%;border-radius:3px;display:flex;align-items:center;text-align:left;gap:10px;margin:5px 0;background:#fffdf8;padding:7px}.match img{width:44px;height:44px;object-fit:cover}.match span:nth-child(2){flex:1;min-width:0}.match strong{font-size:13px}.match span:last-child{font-size:12px}</style><style>
 :root{--paper:#f2eee5;--ink:#242827;--line:#cdc9bf;--green:#265a48;--muted:#67716c}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,sans-serif}header{padding:20px max(5vw,18px);border-bottom:1px solid var(--line)}.brand{font-size:23px;font-weight:750;letter-spacing:-1px}.star{color:#cf5e3f}.sub,.eyebrow{color:var(--muted);font-size:12px;letter-spacing:1.5px;text-transform:uppercase}main{max-width:1100px;margin:auto;padding:32px 5vw 80px}h1,h2{font-family:Georgia,serif;line-height:1.13;letter-spacing:-.8px}h1{font-size:clamp(34px,6vw,58px);margin:8px 0 15px}h2{font-size:28px;margin:0}.intro{max-width:690px;color:#59645f}.alert{border-left:4px solid #b7643e;padding:14px;background:#e9e3d9;margin:25px 0;font-size:14px}.toolbar,.actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 0}.card{border:1px solid var(--line);background:#f8f5ee;padding:19px;margin:13px 0}.cardtop{display:flex;align-items:center;justify-content:space-between;gap:10px}.num{color:var(--green);font-family:Georgia,serif;font-size:23px}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:15px}label{display:block;font-size:12px;color:#4e5b55;letter-spacing:.4px;margin-bottom:5px}input,select,textarea{display:block;border:1px solid #bbb8af;background:#fffdfa;color:var(--ink);font:inherit;padding:11px;width:100%;border-radius:3px;min-height:43px}button{background:transparent;color:var(--ink);border:1px solid #aeb2aa;padding:10px 16px;border-radius:24px;font:inherit;cursor:pointer;min-height:44px}button.primary{background:var(--green);color:#fff;border-color:var(--green)}button:focus-visible,input:focus-visible{outline:3px solid #d9874f;outline-offset:2px}.muted{color:var(--muted);font-size:13px}.date{font-variant-numeric:tabular-nums}.limelight{border-color:#b88c63;background:#f1e9df}.limelight .num{color:#98512b}.status{margin-top:12px;min-height:22px;color:var(--green)}.footer{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}#cards{margin:15px 0}@media(max-width:720px){main{padding:24px 16px 65px}.fields{grid-template-columns:1fr 1fr}.fields>div:last-child{grid-column:span 2}.card{padding:14px}.toolbar button{flex:1}.cardtop h2{font-size:21px}}@media(max-width:365px){.fields{grid-template-columns:1fr}.fields>div:last-child{grid-column:auto}}
 </style>
 <header><div class="brand">sunday rotation<span class="star">✳</span></div><div class="sub">Edition Studio · design preview</div></header>
-<main><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
+<main>
+<nav class="admin-nav" aria-label="Admin sections">
+<button type="button" class="admin-tab active" data-panel="editions">Editions</button>
+<button type="button" class="admin-tab" data-panel="suggestions">Suggestions <span id="suggestionsCount"></span></button>
+<button type="button" class="admin-tab" data-panel="settings">Settings</button>
+</nav>
+<div class="admin-panel" id="panel-editions"><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
 <p class="intro">Ten records across any genres, with an optional eleventh in the Limelight. Build editions weeks ahead, then review everything before publishing.</p>
 <div class="alert"><strong>Preview only.</strong> This editor stores drafts in this browser, not Cloudflare. No admin authentication, automatic album lookup or publishing is enabled yet. Do not use it for confidential material.</div>
 <div class="toolbar"><label style="flex:1;min-width:190px">Edition start (Sunday)<input type="date" id="start" value="2026-10-25"></label><div style="flex:1;min-width:190px"><label>Edition number</label><div id="edition" style="min-height:43px;padding:11px;border:1px solid var(--line);background:#e9e5db;font-weight:700" aria-live="polite">02</div></div></div>
@@ -14,8 +20,23 @@
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft on this device</button><button id="download">Export this edition ↓</button></div><div class="status" id="status" role="status"></div>
-<div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div></main>
+<div class="actions"><button id="save" class="primary">Save draft on this device</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
+<div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div>
+</div>
+<section class="admin-panel" id="panel-suggestions" hidden>
+<div class="eyebrow">FROM THE CLUB</div><h1>Listener suggestions.</h1>
+<p class="intro">Recommendations submitted by registered Sunday Rotation listeners will arrive here after secure Cloudflare integration. Artist and album are required; the reason is optional.</p>
+<div class="alert">No live suggestion inbox is connected yet. This section will never display invented recommendations.</div>
+<div class="card"><h2>Suggestions inbox</h2><p class="muted">No server data loaded. When connected, you will be able to shortlist, dismiss or add suggestions to any edition, with duplicate album suggestions grouped together.</p></div>
+<div class="card"><h2>Moderation rules</h2><p>Only registered listeners can submit. Public visitors may browse approved suggestions. Contributors can choose whether their display name is credited. Nothing is automatically added to a weekly edition.</p></div>
+</section>
+<section class="admin-panel" id="panel-settings" hidden>
+<div class="eyebrow">ADMINISTRATION</div><h1>Studio settings.</h1>
+<div class="card"><h2>Publishing</h2><p class="muted">Planned weekly changeover: Sunday at 00:00 Europe/Berlin. Exactly ten regular albums; one optional Limelight album. An incomplete draft cannot be scheduled.</p><p class="muted">Future editions are hidden from listeners until their publication date. Previous editions stay accessible in the archive.</p></div>
+<div class="card"><h2>Backup &amp; restore</h2><p>Save a copy of your current edition to your device, or restore a previously exported draft.</p><div class="actions"><button type="button" id="settingsExport">Export current draft ↓</button><button type="button" id="settingsImportButton">Import JSON backup ↑</button><input id="settingsImport" type="file" accept=".json,application/json" hidden></div><div id="settingsStatus" class="status" role="status"></div></div>
+<div class="card"><h2>Security &amp; cloud sync</h2><p class="muted">Admin credentials will be verified by Cloudflare before any editing, scheduling or moderation endpoints are activated. GitHub Pages alone cannot protect admin operations. Until then, drafts remain on this browser only.</p></div>
+</section>
+</main>
 <script>
 const $=id=>document.getElementById(id);
 const blank=()=>({artist:"",album:"",genre:"",year:null,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:""});
@@ -83,6 +104,12 @@ function editionNumber(){
   const weeks=Math.round((Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate())-EDITION_ONE)/604800000);
   return weeks>=0?weeks+1:null;
 }
+function showPanel(name){
+  document.querySelectorAll(".admin-panel").forEach(p=>p.hidden=p.id!=="panel-"+name);
+  document.querySelectorAll(".admin-tab").forEach(b=>{const active=b.dataset.panel===name;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});
+  window.scrollTo(0,0);
+}
+document.querySelectorAll(".admin-tab").forEach(b=>b.onclick=()=>showPanel(b.dataset.panel));
 function editionKey(){return base+$("start").value}
 function getData(){collect();return {format:"sunday-rotation-edition-preview-v1",starts_on:$("start").value,edition_number:editionNumber(),albums:rows,limelight:$("addLight").checked?light:null}}
 function validSunday(){const d=new Date($("start").value+"T12:00:00Z");return !Number.isNaN(+d)&&d.getUTCDay()===0}
@@ -96,5 +123,21 @@ $("download").onclick=()=>{const blob=new Blob([JSON.stringify(getData(),null,2)
 function shift(days){collect();const d=new Date($("start").value+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);$("start").value=d.toISOString().slice(0,10);load()}
 $("past").onclick=()=>shift(-7);$("future").onclick=()=>shift(7);
 $("newDraft").onclick=()=>{if(!confirm("Clear the current form? Previously saved drafts will remain."))return;rows=Array.from({length:10},blank);light=blank();$("addLight").checked=false;draw();$("status").textContent="Blank draft ready; not saved."};
+$("settingsExport").onclick=()=> $("download").click();
+$("settingsImportButton").onclick=()=> $("settingsImport").click();
+$("settingsImport").onchange=async event=>{
+  const file=event.target.files?.[0];if(!file)return;
+  try{
+    if(file.size>1000000)throw Error("File too large");
+    const data=JSON.parse(await file.text());
+    if(data.format!=="sunday-rotation-edition-preview-v1"||!Array.isArray(data.albums)||data.albums.length!==10)throw Error("Unsupported edition backup");
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.starts_on))throw Error("Invalid date");
+    const restored=Array.from({length:10},(_,i)=>({...blank(),...data.albums[i]}));
+    rows=restored;light={...blank(),...(data.limelight||{})};
+    $("start").value=data.starts_on;$("addLight").checked=!!data.limelight;
+    if(editionNumber()===null)throw Error("Edition must begin on Sunday, 18 October 2026 or later");
+    draw();updateDates();showPanel("editions");$("status").textContent="Backup restored to this form. Choose Save draft to keep it on this browser.";
+  }catch(e){$("settingsStatus").textContent="Could not restore: "+e.message}finally{event.target.value=""}
+};
 load();
 </script></html>
