@@ -74,6 +74,9 @@ export default {
       if(u.pathname==="/health"&&request.method==="GET"){
         await env.DB.prepare("SELECT 1 FROM listeners LIMIT 1").first();
         res=reply({ok:true,service:"sunday-rotation-api",database:"connected",deployment_test:"github-auto-2026-10-19"});
+      }else if(u.pathname==="/members/count"&&request.method==="GET"){
+        const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM listeners").first();
+        res=reply({members:Number(count?.total||0)});
       }else if(u.pathname==="/register"&&request.method==="POST"){
         res=await register(await parse(request),env.DB);
       }else{
