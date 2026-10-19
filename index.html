@@ -41,6 +41,41 @@ footer{width:100%;max-width:1500px;margin:0 auto!important;padding-left:5vw!impo
  footer{padding-left:5vw!important;padding-right:5vw!important}
 }
 @media(max-width:365px){header .masthead strong{font-size:19px}header .tagline{font-size:9px}header .member-strip{font-size:9px}header .member-strip button{font-size:10px}}
+</style><style>
+/* Mobile layout repair: prevent inherited editorial typography from overflowing */
+html,body{max-width:100%;overflow-x:clip}
+header .member-strip strong{font:inherit!important;font-weight:700!important;letter-spacing:0!important;color:inherit!important}
+header .member-strip .identity-name{font-size:12px!important;line-height:1.35!important}
+header .member-strip .identity-id{font-size:11px!important}
+section:first-child>.split{align-items:start}
+section:first-child>.split>div{min-width:0}
+section:first-child h1,section:first-child h1 em{white-space:normal!important;overflow-wrap:normal;word-break:normal}
+section:first-child h1{max-width:100%;text-wrap:balance}
+.hero-art{box-sizing:border-box}
+@media(max-width:800px){
+ main,section{min-width:0;max-width:100%}
+ section:first-child>.split{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:22px!important}
+ section:first-child h1{font-size:clamp(34px,8.7vw,52px)!important;line-height:1.06!important;letter-spacing:-1.5px!important;max-width:100%!important;margin:22px 0!important}
+ section:first-child h1 em{display:inline;letter-spacing:-1px!important}
+ section:first-child>.split>div>p:not(.lead){font-size:15px;line-height:1.65;max-width:100%}
+ .hero-art{width:min(100%,420px)!important;max-width:100%!important;height:340px!important;min-height:0!important;margin:20px auto 48px!important}
+ .collage-cover{width:30%!important;box-shadow:0 4px 12px #26313a25!important}
+ .collage-0{top:3%;left:34%}.collage-1{top:11%;left:6%}.collage-2{top:11%;right:6%}
+ .collage-3{top:30%;left:20%}.collage-4{top:30%;right:20%}.collage-5{top:50%;left:3%}
+ .collage-6{top:50%;right:3%}.collage-7{top:53%;left:35%}.collage-8{top:73%;left:20%}.collage-9{top:73%;right:20%}
+ header{align-items:center!important}
+ header .masthead{max-width:65%}
+ header .member-strip{max-width:35%!important;min-width:0}
+ header .masthead strong{white-space:normal!important}
+ footer{max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-width:420px){
+ header .masthead strong{font-size:clamp(19px,5.6vw,25px)!important}
+ header .member-strip .identity-name{font-size:11px!important}
+ header .member-strip .identity-id{font-size:10px!important}
+ .hero-art{height:290px!important}
+ section:first-child h1{font-size:clamp(33px,8.6vw,40px)!important}
+}
 </style><header><div class="masthead"><strong>sunday rotation<svg class="brand-mark" width="27" height="27" viewBox="0 0 40 40" role="img" aria-label="Sunday Rotation starburst"><line x1="20" y1="20" x2="20.00" y2="5.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="30.61" y2="9.39" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="35.00" y2="20.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="30.61" y2="30.61" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="20.00" y2="35.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="9.39" y2="30.61" stroke="#242827" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="5.00" y2="20.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="9.39" y2="9.39" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/></svg></strong><span class="tagline">A weekly music club for curious ears.</span></div><div id="memberStrip" class="member-strip" aria-live="polite">Sign in to save your listening journal.</div></header><nav aria-label="Main navigation" id="nav"></nav><main>
 <section class="active"><div class="split"><div><div class="eyebrow">SUNDAY SELECTION</div><h1>Ten records for the week ahead.<br><em>Find the one that stays with you.</em></h1><p>Pick something that catches your ear. Listen on your own music service. Come back with a feeling, a favourite moment, or a score. One discovery makes a good week.</p><button onclick="go(1)">Find your next record ↗</button></div><div class="hero-art" id="heroCollage" aria-label="Preview of all ten albums in this week’s selection"></div></div><div class="grid"><div><h3>Follow your curiosity.</h3><p>Ten different starting points. Listen to one, several, or revisit something you already love.</p></div><div><h3>Leave an impression.</h3><p>A score, a mood, a moment. Your listening journal grows as you hear.</p></div><div><h3>Bring a record.</h3><p>Help shape the next shelf. There is always room for another pair of ears.</p></div></div></section>
 <section><div class="edition-line"><div class="eyebrow">18/10/2026 – 24/10/2026</div><small>Ten albums · Chosen by Harry</small></div><h2>The Sunday Rotation Club</h2><p class="lead">10 albums across all genres and moods</p><div class="filters" id="filters"></div><div class="shelf" id="shelf"></div><p class="fineprint">Approximate running times refer to the linked editions. Genre labels are starting points, not boundaries. Album details and artwork: Apple Music / iTunes catalog; artwork belongs to its respective rights holders.</p></section>
