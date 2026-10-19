@@ -143,14 +143,28 @@ reviewForm.onsubmit=async e=>{
   const albumId=albums[chosen].id;
   try{
     await call("/journal","PUT",{album_id:albumId,status:"rated",score:review.score,mood:review.moods.join(", "),notes:JSON.stringify({moods:review.moods,highlights:review.highlights,again:review.again,favourite:review.favourite,note:review.note})});
-    reviews[albumId]=review;renderShelf();renderJournal();el("deleteReview").disabled=true;
+    reviews[albumId]=review;renderShelf();renderJournal();el("deleteReview").disabled=false;
     el("status").textContent="Saved to your private journal.";
     await clubScore(albumId);
   }catch(err){el("status").textContent="Not saved: "+err.message+". Please try again."}
   finally{b.disabled=false}
 };
 el("deleteReview").disabled=true;
-el("deleteReview").onclick=()=>{el("status").textContent="Removing a saved rating is not yet available in this test. You can edit its score."};
+el("deleteReview").onclick=async ()=>{
+  if(!account){gate(true);return}
+  const album=albums[chosen], albumId=album.id;
+  if(!reviews[albumId])return;
+  if(!confirm("Delete your review of "+album.title+"? This also removes your score from the club average."))return;
+  const button=el("deleteReview");button.disabled=true;el("status").textContent="Deleting from your journal…";
+  try{
+    await call("/journal?album_id="+encodeURIComponent(albumId),"DELETE");
+    delete reviews[albumId];
+    renderShelf();renderJournal();
+    if(albums[chosen].id===albumId){loadReview();button.disabled=true;el("status").textContent="Review deleted from your journal and the club average.";await clubScore(albumId)}
+  }catch(err){el("status").textContent="Could not delete: "+err.message;button.disabled=false}
+};
+const previousLoadReview=loadReview;
+loadReview=function(){previousLoadReview();el("deleteReview").disabled=!account||!reviews[albums[chosen].id]};
 el("importButton").disabled=true;
 el("importButton").title="Import requires server synchronisation and is not enabled yet";
 async function clubScore(id){
