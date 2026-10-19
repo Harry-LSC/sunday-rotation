@@ -8,7 +8,7 @@
 <main><div class="eyebrow">The curator's desk</div><h1>Prepare the next rotation.</h1>
 <p class="intro">Ten records across any genres, with an optional eleventh in the Limelight. Build editions weeks ahead, then review everything before publishing.</p>
 <div class="alert"><strong>Preview only.</strong> This editor stores drafts in this browser, not Cloudflare. No admin authentication, automatic album lookup or publishing is enabled yet. Do not use it for confidential material.</div>
-<div class="toolbar"><label style="flex:1;min-width:190px">Edition start (Sunday)<input type="date" id="start" value="2026-10-25"></label><label style="flex:1;min-width:190px">Edition<input id="edition" type="number" min="2" value="2"></label></div>
+<div class="toolbar"><label style="flex:1;min-width:190px">Edition start (Sunday)<input type="date" id="start" value="2026-10-25"></label><div style="flex:1;min-width:190px"><label>Edition number</label><div id="edition" style="min-height:43px;padding:11px;border:1px solid var(--line);background:#e9e5db;font-weight:700" aria-live="polite">02</div></div></div>
 <p class="muted date" id="dateRange"></p>
 <div class="toolbar"><button id="past">← Previous draft</button><button id="future">Next draft →</button><button id="newDraft">Start fresh</button></div>
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
@@ -76,17 +76,24 @@ document.addEventListener("click",e=>{
   const b=e.target.closest(".lookupButton");
   if(b)fetchAlbum(b.dataset.type,Number(b.dataset.index));
 });
+const EDITION_ONE=Date.UTC(2026,9,18);
+function editionNumber(){
+  const date=new Date($("start").value+"T12:00:00Z");
+  if(!validSunday())return null;
+  const weeks=Math.round((Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate())-EDITION_ONE)/604800000);
+  return weeks>=0?weeks+1:null;
+}
 function editionKey(){return base+$("start").value}
-function getData(){collect();return {format:"sunday-rotation-edition-preview-v1",starts_on:$("start").value,edition_number:+$("edition").value,albums:rows,limelight:$("addLight").checked?light:null}}
+function getData(){collect();return {format:"sunday-rotation-edition-preview-v1",starts_on:$("start").value,edition_number:editionNumber(),albums:rows,limelight:$("addLight").checked?light:null}}
 function validSunday(){const d=new Date($("start").value+"T12:00:00Z");return !Number.isNaN(+d)&&d.getUTCDay()===0}
-function updateDates(){const d=new Date($("start").value+"T12:00:00Z");const end=new Date(+d+6*86400000);$("dateRange").textContent=validSunday()?("Scheduled week: "+$("start").value+" to "+end.toISOString().slice(0,10)):"Choose a Sunday as the start date."}
-function load(){try{const d=JSON.parse(localStorage.getItem(editionKey())||"null");rows=Array.from({length:10},(_,i)=>({...blank(),...(d?.albums?.[i]||{})}));light={...blank(),...(d?.limelight||{})};$("addLight").checked=!!d?.limelight;if(d?.edition_number)$("edition").value=d.edition_number;$("status").textContent=d?"Saved draft loaded from this browser.":"New draft — not saved.";draw();updateDates()}catch{$("status").textContent="Unable to read saved draft."}}
+function updateDates(){const number=editionNumber();$("edition").textContent=number===null?"—":String(number).padStart(2,"0");const d=new Date($("start").value+"T12:00:00Z");const end=new Date(+d+6*86400000);$("dateRange").textContent=validSunday()?("Scheduled week: "+$("start").value+" to "+end.toISOString().slice(0,10)):"Choose a Sunday as the start date."}
+function load(){try{const d=JSON.parse(localStorage.getItem(editionKey())||"null");rows=Array.from({length:10},(_,i)=>({...blank(),...(d?.albums?.[i]||{})}));light={...blank(),...(d?.limelight||{})};$("addLight").checked=!!d?.limelight;$("status").textContent=d?"Saved draft loaded from this browser.":"New draft — not saved.";draw();updateDates()}catch{$("status").textContent="Unable to read saved draft."}}
 $("cards").addEventListener("input",collect);$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
-$("save").onclick=()=>{if(!validSunday()){$("status").textContent="Start date must be a Sunday.";return}try{localStorage.setItem(editionKey(),JSON.stringify(getData()));$("status").textContent="Draft saved on this browser only."}catch{$("status").textContent="Browser storage unavailable. Export a backup."}};
+$("save").onclick=()=>{if(editionNumber()===null){$("status").textContent="Choose a Sunday on or after 18 October 2026.";return}try{localStorage.setItem(editionKey(),JSON.stringify(getData()));$("status").textContent="Draft saved on this browser only."}catch{$("status").textContent="Browser storage unavailable. Export a backup."}};
 $("download").onclick=()=>{const blob=new Blob([JSON.stringify(getData(),null,2)],{type:"application/json"});const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download="Sunday_Rotation_Edition_"+$("start").value+"_draft.json";a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)};
-function shift(days){collect();const d=new Date($("start").value+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);$("start").value=d.toISOString().slice(0,10);$("edition").value=Math.max(1,+$("edition").value+(days>0?1:-1));load()}
+function shift(days){collect();const d=new Date($("start").value+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+days);$("start").value=d.toISOString().slice(0,10);load()}
 $("past").onclick=()=>shift(-7);$("future").onclick=()=>shift(7);
 $("newDraft").onclick=()=>{if(!confirm("Clear the current form? Previously saved drafts will remain."))return;rows=Array.from({length:10},blank);light=blank();$("addLight").checked=false;draw();$("status").textContent="Blank draft ready; not saved."};
 load();
