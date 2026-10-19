@@ -31,7 +31,7 @@ function metadataCard(r,type,i){
 }
 function draw(){
   $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+'</div>'+metadataCard(r,"regular",i)+'</div>').join("");
-  $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+'</div>'+metadataCard(light,"light",0)+'</div>':"";
+  $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+'</div>'+metadataCard(light,"light",0):"";
 }
 function collect(){document.querySelectorAll("input[data-type]").forEach(el=>{const target=el.dataset.type==="light"?light:rows[+el.dataset.index];target[el.dataset.key]=el.value.trim()})}
 async function fetchAlbum(type,i){
