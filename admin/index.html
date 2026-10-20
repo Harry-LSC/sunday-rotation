@@ -104,14 +104,14 @@ $("adminLogin").onsubmit=async e=>{
   }catch(e){$("adminGateStatus").textContent="This browser isn't authorized. Enter your private recovery key."}
 })();
 
-const blank=()=>({artist:"",album:"",genre:"",mood:"",year:null,year_override:false,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",listen_when:"",listen_for:"",why_here:"",description:""});
+const blank=()=>({artist:"",album:"",genre:"",mood:"",year:null,year_override:false,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",hook:"",listen_when:"",listen_for:"",why_here:"",description:""});
 let rows=Array.from({length:10},blank),light=blank();
 const base="sr-admin-preview:";
 const escapeHTML=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
 function field(label,value,type,i,k){return '<div><label for="'+type+'-'+i+'-'+k+'">'+label+'</label><input id="'+type+'-'+i+'-'+k+'" data-type="'+type+'" data-index="'+i+'" data-key="'+k+'" value="'+escapeHTML(value)+'" placeholder="'+(k==="artist"?"Artist name":k==="album"?"Album title":"Any genre")+'"></div>'}
 function yearField(r,type,i){return '<div><label for="year-'+type+'-'+i+'">Original release year (editable)</label><input type="number" min="1850" max="2200" step="1" id="year-'+type+'-'+i+'" data-year-type="'+type+'" data-year-index="'+i+'" value="'+escapeHTML(r.year??"")+'" placeholder="e.g. 2008"></div>'}
 function editorialFields(r,type,i){
-  const keys=[["description","Short album description"],["listen_when","Listen when"],["listen_for","Listen for"],["why_here","Why it is here"]];
+  const keys=[["hook","Album hook (4–10 words)"],["description","Album description"],["listen_when","Listen when"],["listen_for","Listen for"],["why_here","Why it is here"]];
   return '<details class="editorial"><summary>Edit sleeve notes and description</summary><div class="actions"><button type="button" class="generateNotes" data-type="'+type+'" data-index="'+i+'">✦ Generate Sleeve Notes</button><span class="muted">AI first draft · check before saving</span></div><div class="generationMessage" aria-live="polite"></div>'+
     keys.map(([key,label])=>'<label for="note-'+type+'-'+i+'-'+key+'">'+label+'</label><textarea id="note-'+type+'-'+i+'-'+key+'" data-note-type="'+type+'" data-note-index="'+i+'" data-note-key="'+key+'" rows="2" placeholder="Write or edit before scheduling">'+escapeHTML(r[key]||"")+'</textarea>').join("")+'</details>';
 }
@@ -475,7 +475,7 @@ function renderSundayPreview(){
   const m=document.createElement("p");m.className="muted";m.textContent=[r.genre,r.year,r.minutes?r.minutes+" min":""].filter(Boolean).join(" · ");
   card.append(h,a,m);
   const details=document.createElement("details"),summary=document.createElement("summary");summary.textContent="Preview sleeve notes";details.append(summary);
-  for(const [label,key] of [["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
+  for(const [label,key] of [["Hook","hook"],["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
    const p=document.createElement("p"),b=document.createElement("strong");b.textContent=label+": ";p.style.cssText="font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere";p.append(b,document.createTextNode(r[key]||"(Missing)"));details.append(p)
   }
   card.append(details);cards.append(card);
