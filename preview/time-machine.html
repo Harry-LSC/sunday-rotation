@@ -22,6 +22,17 @@ const formatBerlin=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",yea
 const tabs=["The Club","This Week","Sleeve Notes","Your Take","Your Journal","The Shelf","Contribute"];
 let state={time:"five",tab:0,browse:2,selected:0};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function richText(v){return esc(v).replace(/\\*([^*\\n]+)\\*/g,"<em>$1</em>")}
+function repairArchiveCovers(){
+ for(const r of db.one.albums){
+  if(r.cover_url||!r.catalog_id)continue;
+  fetch("https://itunes.apple.com/lookup?id="+encodeURIComponent(r.catalog_id)+"&country=US")
+   .then(x=>x.ok?x.json():null).then(result=>{
+    const rec=(result?.results||[]).find(x=>x.collectionId===Number(r.catalog_id));
+    if(rec?.artworkUrl100){r.cover_url=rec.artworkUrl100.replace(/100x100bb/g,"600x600bb");render()}
+   }).catch(()=>{});
+ }
+}
 function activeEdition(){const instant=times.find(x=>x[0]===state.time)[2];return formatBerlin.format(new Date(instant))>="2026-10-25"?2:1}
 function data(n){return n===1?db.one:db.two}
 function rec(n){const x=data(n);return [...x.albums,...(x.limelight?[x.limelight]:[])]}
@@ -46,5 +57,5 @@ function render(){
  if(state.tab===5){target.innerHTML='<h2>The Shelf</h2><p>Completed editions only. This preview displays archived records without requiring a login; the production archive is intended to be members-only.</p>'+(edition===1?'<p class="muted">No editions have expired yet.</p>':cards(rec(1)));return}
  target.innerHTML='<h2>Contribute</h2><div class="previewbox">No changes planned to Contribute. Suggestions are disabled in this preview.</div>';
 }
-render();
+render();repairArchiveCovers();
 </script></body></html>
