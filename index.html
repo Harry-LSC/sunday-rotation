@@ -361,7 +361,7 @@ function redrawEdition(){
  if(prev)prev.disabled=browsingEdition<=1;
  if(next)next.disabled=browsingEdition>=activeEdition;
 
- document.querySelector('#heroCollage').innerHTML=albums.map((a,i)=>`<button type="button" class="collage-cover collage-${i}" onclick="select(${i})" aria-label="Explore ${escapeHTML(a.artist)} — ${escapeHTML(a.title)}">${cover(a)}</button>`).join("");
+ document.querySelector('#heroCollage').innerHTML=currentEditionAlbums.slice(0,10).map((a,i)=>`<button type="button" class="collage-cover collage-${i}" onclick="select(${i})" aria-label="Explore ${escapeHTML(a.artist)} — ${escapeHTML(a.title)}">${cover(a)}</button>`).join("");
  document.querySelector('#reviewAlbum').innerHTML=albums.map((a,i)=>`<option value="${i}">${escapeHTML(a.artist)} — ${escapeHTML(a.title)}</option>`).join("");
  document.querySelector('#albumTabs').innerHTML=albums.map((a,i)=>`<button type="button" class="album-tab" onclick="setAlbum(${i})" aria-pressed="false"><span>${escapeHTML(a.artist)}</span><strong>${escapeHTML(a.title)}</strong></button>`).join("");
  chosen=0;filter="All";renderShelf();setAlbum(0);renderJournal();
