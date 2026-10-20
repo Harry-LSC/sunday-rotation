@@ -20,7 +20,7 @@ const times=[
 ];
 const formatBerlin=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"});
 const tabs=["The Club","This Week","Sleeve Notes","Your Take","Your Journal","The Shelf","Contribute"];
-let state={time:"five",tab:0,browse:2,selected:0};
+let state={time:"five",tab:0,browse:2,selected:0,archivedRecord:null};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function richText(v){return esc(v).replace(/\\*([^*\\n]+)\\*/g,"<em>$1</em>")}
 function repairArchiveCovers(){
@@ -37,11 +37,12 @@ function activeEdition(){const instant=times.find(x=>x[0]===state.time)[2];retur
 function data(n){return n===1?db.one:db.two}
 function rec(n){const x=data(n);return [...x.albums,...(x.limelight?[x.limelight]:[])]}
 function switchTime(k){state.time=k;state.browse=activeEdition();state.selected=0;render()}
-function chooseTab(k){state.tab=k;render()}
+function chooseTab(k){state.tab=k;state.archivedRecord=null;render()}
 function setBrowse(n){if(n<1||n>activeEdition())return;state.browse=n;state.selected=0;render()}
 function meta(r){return [r.genre,r.year,r.minutes?r.minutes+" min":null].filter(Boolean).map(esc).join(" · ")}
 function cards(records,withLimelight=true){return '<div class="shelf">'+records.map((r,i)=>'<button class="album '+(withLimelight&&i===10?'limelight':'')+'" onclick="pick('+i+')" type="button">'+(r.cover_url?'<img loading="lazy" src="'+esc(r.cover_url)+'" alt="">':'<div style="aspect-ratio:1;background:#dfdacd"></div>')+(i===10?'<span class="pill">In the Limelight</span>':'')+'<strong>'+esc(r.album)+'</strong><span class="text">'+esc(r.artist)+'</span><span class="text muted">'+meta(r)+'</span><span class="text">'+esc(r.hook||"")+'</span></button>').join('')+'</div>'}
-function pick(i){state.selected=i;state.tab=2;render()}
+function pick(i){state.selected=i;state.tab=2;state.archivedRecord=null;render()}
+function openArchived(i){state.archivedRecord=i;state.tab=5;render()}
 function detail(r){return '<div class="details detailgrid">'+(r.cover_url?'<img src="'+esc(r.cover_url)+'" alt="">':'<div></div>')+'<div>'+(r===db.two.limelight?'<span class="pill">In the Limelight</span>':'')+'<h2>'+esc(r.album)+'</h2><p>'+esc(r.artist)+'</p><p class="muted">'+meta(r)+'</p><h3>'+esc(r.hook||"")+'</h3><p class="notes">'+esc(r.description||"")+'</p>'+[["Listen when",r.listen_when],["Listen for",r.listen_for],["Why it’s here",r.why_here]].map(([title,body])=>'<h3>'+title+'</h3><p class="notes">'+esc(body||"")+'</p>').join('')+'</div></div>'}
 function render(){
  const edition=activeEdition();
@@ -51,10 +52,10 @@ function render(){
  const current=data(edition),view=data(state.browse),albumList=rec(state.browse),target=document.getElementById("content");
  if(state.tab===0){target.innerHTML='<div class="club-hero"><div class="club-copy"><p class="date">Edition '+edition+' · '+(edition===1?'18–24':'25–31')+' October 2026</p><h2>Ten records for the week ahead.<br><em>Find the one that stays with you.</em></h2><p>Pick something that catches your ear. Listen on your own music service. Come back with a feeling, a favourite moment, or a score. One discovery makes a good week.</p><button type="button" onclick="chooseTab(1)">Find your next record ↗</button></div><div class="club-art" aria-label="Scattered album artwork from the current edition">'+current.albums.map((r,i)=>'<button type="button" class="club-cover club-cover-'+i+'" onclick="state.browse='+edition+';pick('+i+')" aria-label="'+esc(r.artist)+' — '+esc(r.album)+'"><img src="'+esc(r.cover_url)+'" alt=""></button>').join('')+'</div></div>'+(current.limelight?'<div class="club-limelight"><img src="'+esc(current.limelight.cover_url)+'" alt=""><div><span class="pill">In the Limelight</span><h3>'+esc(current.limelight.artist)+' — '+esc(current.limelight.album)+'</h3><p>'+esc(current.limelight.hook)+'</p><button type="button" onclick="state.browse='+edition+';pick(10)">Explore the Limelight ↗</button></div></div>':'');return}
  if(state.tab===1){target.innerHTML='<div class="subnav"><button '+(state.browse===1?'disabled':'')+' onclick="setBrowse('+(state.browse-1)+')">← Previous</button><strong>Edition '+String(state.browse).padStart(2,"0")+'</strong><button '+(state.browse===edition?'disabled':'')+' onclick="setBrowse('+(state.browse+1)+')">Next →</button></div><p class="date">'+(state.browse===1?'18–24':'25–31')+' October 2026</p><h2>The Sunday Rotation Club</h2><p>'+view.albums.length+' albums across all genres and moods'+(view.limelight?' · +1 In the Limelight':'')+'</p>'+cards(albumList);return}
- if(state.tab===2){target.innerHTML='<h2>Sleeve Notes</h2><p class="date">Edition '+state.browse+'</p><div class="selectors">'+albumList.map((r,i)=>'<button class="'+(state.selected===i?'selected':'')+'" onclick="state.selected='+i+';render()">'+esc(r.artist)+' — '+esc(r.album)+'</button>').join('')+'</div>'+detail(albumList[Math.min(state.selected,albumList.length-1)]);return}
+ if(state.tab===2){const latest=rec(edition);target.innerHTML='<h2>Sleeve Notes</h2><p class="date">Current edition '+edition+'</p><div class="selectors">'+latest.map((r,i)=>'<button class="'+(state.selected===i?'selected':'')+'" onclick="state.selected='+i+';render()">'+esc(r.artist)+' — '+esc(r.album)+'</button>').join('')+'</div>'+detail(latest[Math.min(state.selected,latest.length-1)]);return}
  if(state.tab===3){target.innerHTML='<h2>Your Take</h2><div class="previewbox"><strong>Read-only form preview.</strong><p>Choose an Edition '+state.browse+' record below. Ratings are intentionally disabled in this rehearsal.</p><label>Album</label> <select>'+albumList.map(r=>'<option>'+esc(r.artist)+' — '+esc(r.album)+'</option>').join('')+'</select></div>';return}
  if(state.tab===4){target.innerHTML='<h2>Your Journal</h2><div class="previewbox">Listener data is not loaded in this staging preview. The production journal must be separately tested for cross-edition preservation.</div>';return}
- if(state.tab===5){target.innerHTML='<h2>The Shelf</h2><p>Completed editions only. This preview displays archived records without requiring a login; the production archive is intended to be members-only.</p>'+(edition===1?'<p class="muted">No editions have expired yet.</p>':cards(rec(1)));return}
+ if(state.tab===5){if(state.archivedRecord!==null&&edition>1){target.innerHTML='<button onclick="state.archivedRecord=null;render()">← Back to The Shelf</button><p class="date">From Edition 01 · 18–24 October 2026</p>'+detail(rec(1)[state.archivedRecord]);return}target.innerHTML='<h2>The Shelf</h2><p>Completed editions only. This preview displays archived records without requiring a login; the production archive is intended to be members-only.</p>'+(edition===1?'<p class="muted">No editions have expired yet.</p>':'<div class="shelf">'+rec(1).map((r,i)=>'<button class="album" onclick="openArchived('+i+')"><img src="'+esc(r.cover_url||'')+'" alt=""><strong>'+esc(r.album)+'</strong><span class="text">'+esc(r.artist)+'</span><span class="text">'+esc(r.hook||'')+'</span></button>').join('')+'</div>');return}
  target.innerHTML='<h2>Contribute</h2><div class="previewbox">No changes planned to Contribute. Suggestions are disabled in this preview.</div>';
 }
 render();repairArchiveCovers();
