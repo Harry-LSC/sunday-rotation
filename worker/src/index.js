@@ -37,7 +37,7 @@ async function journal(request,db,listener){
     return reply({entries:r.results||[]});
   }
   const data=await parse(request),id=String(data?.album_id??""),status=data?.status,score=data?.score??null;
-  if(!albums.has(id))return error("Unknown album");
+  if(!(await knownAlbum(db,id)))return error("Unknown album");
   if(!["want_to_listen","listened","rated"].includes(status))return error("Invalid status");
   if(status==="rated"&&!(typeof score==="number"&&Number.isFinite(score)&&score>=0&&score<=10&&Number.isInteger(score*2)))return error("Invalid score");
   if(status!=="rated"&&score!==null)return error("Only rated albums can have a score");
@@ -193,6 +193,80 @@ async function adminDraft(request,url,db,listener){
 
 
 
+
+async function knownAlbum(db,id){
+ if(!/^[0-9]{5,20}$/.test(String(id||"")))return false;
+ if(albums.has(String(id)))return true;
+ await editionsSchema(db);
+ const found=await db.prepare("SELECT 1 AS found FROM scheduled_album_ids WHERE album_id=? LIMIT 1").bind(String(id)).first();
+ return !!found;
+}
+function berlinDate(now=new Date()){
+ return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
+}
+async function publicationSchema(db){
+ await editionsSchema(db);
+ await db.prepare(`CREATE TABLE IF NOT EXISTS scheduled_editions(
+  starts_on TEXT PRIMARY KEY,edition_number INTEGER NOT NULL,payload_json TEXT NOT NULL,
+  draft_version INTEGER NOT NULL,scheduled_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+ )`).run();
+ await db.prepare(`CREATE TABLE IF NOT EXISTS scheduled_album_ids(
+  album_id TEXT NOT NULL,starts_on TEXT NOT NULL,
+  PRIMARY KEY(album_id,starts_on)
+ )`).run();
+}
+function checkedForPublication(d,date){
+ const obj=validateEditionDraft(d,date);
+ const ids=new Set();
+ const entries=[...obj.albums,...(obj.limelight?[obj.limelight]:[])];
+ for(const [i,r] of entries.entries()){
+  for(const k of ["artist","album","hook","description","listen_when","listen_for","why_here","cover_url"]){
+   if(!r[k]||!r[k].trim())throw Error("Album "+(i+1)+" missing "+k);
+  }
+  if(!/^https:\/\//.test(r.cover_url))throw Error("Album "+(i+1)+" artwork URL invalid");
+  if(!/^[0-9]{5,20}$/.test(String(r.catalog_id||"")))throw Error("Album "+(i+1)+" needs catalogue ID");
+  if(ids.has(String(r.catalog_id)))throw Error("Duplicate catalogue album ID");
+  ids.add(String(r.catalog_id));
+  if(!Number.isInteger(r.year)||r.year<1850||r.year>2200)throw Error("Album "+(i+1)+" needs release year");
+ }
+ return obj;
+}
+async function publicationRead(db,url){
+ await publicationSchema(db);
+ const date=url.searchParams.get("simulate_date")||berlinDate();
+ // Simulated dates are allowed only for a separate diagnostic endpoint, never public publication.
+ if(url.searchParams.has("simulate_date"))return error("Simulated date not allowed",403);
+ const result=await db.prepare("SELECT payload_json,starts_on,edition_number FROM scheduled_editions WHERE starts_on<=? ORDER BY starts_on DESC LIMIT 1").bind(date).first();
+ return reply(result?{found:true,edition:JSON.parse(result.payload_json),effective_date:date}:{found:false,legacy_edition:1,effective_date:date});
+}
+async function publicationArchive(db){
+ await publicationSchema(db);
+ const today=berlinDate();
+ const found=await db.prepare("SELECT starts_on,edition_number FROM scheduled_editions WHERE starts_on<? ORDER BY starts_on DESC LIMIT 100").bind(today).all();
+ return reply({editions:[{starts_on:"2026-10-18",edition_number:1,legacy:true},...(found.results||[])]});
+}
+async function adminSchedule(request,url,db,listener){
+ if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+ if(request.method!=="POST")return error("Method not allowed",405);
+ const input=await parse(request),date=input?.starts_on;
+ if(editionNumberFromDate(date)===null||date<="2026-10-18")return error("Invalid future edition");
+ await publicationSchema(db);
+ const draft=await db.prepare("SELECT payload_json,version FROM studio_drafts WHERE starts_on=?").bind(date).first();
+ if(!draft)return error("No saved Cloudflare draft for this Sunday",404);
+ if(input.expected_version!==draft.version)return error("Draft changed; reload it first",409);
+ let edition;
+ try{edition=checkedForPublication(JSON.parse(draft.payload_json),date)}
+ catch(e){return error(e.message)}
+ if(date<=berlinDate())return error("Cannot schedule today or a past edition");
+ const exists=await db.prepare("SELECT 1 AS yes FROM scheduled_editions WHERE starts_on=?").bind(date).first();
+ if(exists)return error("Already scheduled. Existing publication snapshot has not been changed.",409);
+ const raw=JSON.stringify(edition);
+ await db.prepare("INSERT INTO scheduled_editions(starts_on,edition_number,payload_json,draft_version) VALUES(?,?,?,?)").bind(date,edition.edition_number,raw,draft.version).run();
+ for(const r of [...edition.albums,...(edition.limelight?[edition.limelight]:[])])
+  await db.prepare("INSERT OR IGNORE INTO scheduled_album_ids(album_id,starts_on) VALUES(?,?)").bind(String(r.catalog_id),date).run();
+ return reply({scheduled:true,starts_on:date,edition_number:edition.edition_number,version:draft.version,publication:"automatic-on-local-Sunday-date"});
+}
+
 async function adminMembers(db,listener){
   if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
   const result=await db.prepare("SELECT display_name FROM listeners ORDER BY created_at DESC LIMIT 5000").all();
@@ -322,6 +396,10 @@ export default {
       if(u.pathname==="/health"&&request.method==="GET"){
         await env.DB.prepare("SELECT 1 FROM listeners LIMIT 1").first();
         res=reply({ok:true,service:"sunday-rotation-api",database:"connected",deployment_test:"github-auto-2026-10-19"});
+      }else if(u.pathname==="/editions/current"&&request.method==="GET"){
+        res=await publicationRead(env.DB,u);
+      }else if(u.pathname==="/editions/archive"&&request.method==="GET"){
+        res=await publicationArchive(env.DB);
       }else if(u.pathname==="/members/count"&&request.method==="GET"){
         const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM listeners").first();
         res=reply({members:Number(count?.total||0)});
@@ -336,6 +414,7 @@ export default {
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
         else if(u.pathname==="/admin/library"&&["GET","POST","PUT"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
+        else if(u.pathname==="/admin/schedule"&&request.method==="POST")res=await adminSchedule(request,u,env.DB,listener);
         else if(u.pathname==="/admin/generate-notes"&&request.method==="POST")res=await generateSleeveNotes(request,env,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
         else if(u.pathname==="/journal"&&request.method==="DELETE")res=await deleteRating(u.searchParams.get("album_id"),env.DB,listener);
