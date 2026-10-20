@@ -153,6 +153,7 @@ function scrubRecord(record){
   const id=record.catalog_id??null;
   if(id!==null&&(typeof id!=="string"&&typeof id!=="number"||String(id).length>80))throw Error("Invalid catalogue ID");
   result.catalog_id=id;
+  result.year_override=record.year_override===true;
   return result;
 }
 function validateEditionDraft(payload,date){
