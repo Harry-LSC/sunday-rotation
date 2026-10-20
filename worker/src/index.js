@@ -147,7 +147,7 @@ async function editionsSchema(db){
 function scrubRecord(record){
   if(!record||typeof record!=="object"||Array.isArray(record))throw Error("Invalid album data");
   const result={};
-  const fields=["artist","album","genre","mood","cover_url","source_url","metadata_source","listen_when","listen_for","why_here","description"];
+  const fields=["artist","album","genre","mood","hook","cover_url","source_url","metadata_source","listen_when","listen_for","why_here","description"];
   for(const k of fields){const v=record[k]??"";if(typeof v!=="string"||v.length>4000)throw Error("Invalid album field: "+k);result[k]=v.trim()}
   for(const k of ["year","minutes","track_count"]){const v=record[k]??null;if(v!==null&&(!Number.isFinite(v)||v<0||v>100000))throw Error("Invalid "+k);result[k]=v}
   const id=record.catalog_id??null;
