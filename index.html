@@ -234,7 +234,7 @@ function localSave(){localStorage.setItem(STORAGE,JSON.stringify({listener_id:ac
 async function recover(key){
   const m=await call("/me","GET",null,key);
   if(!m.listener?.listener_id)throw Error("Invalid recovery key");
-  token=key;account=m.listener;localSave();showAccount();await syncJournal();gate(false);
+  token=key;account=m.listener;localSave();showAccount();await loadArchiveShelf();await syncJournal();gate(false);
 }
 async function syncJournal(){
   const result=await call("/journal");
@@ -380,7 +380,25 @@ function browseEdition(n){
  redrawEdition();
 }
 
-const shelfEditions=new Map([[1,{date:"18–24 October 2026",albums:editionOneAlbums}]]);
+const shelfEditions=new Map();
+async function loadArchiveShelf(){
+ if(!token||!account)return;
+ try{
+  const response=await call("/editions/archive");
+  shelfEditions.clear();
+  if(response.legacy_edition_1?.available)shelfEditions.set(1,{date:"18–24 October 2026",albums:editionOneAlbums});
+  for(const item of response.editions||[]){
+   const edition=item.edition;
+   if(!edition||!Array.isArray(edition.albums))continue;
+   const records=edition.albums.map(adaptEditionAlbum);
+   if(edition.limelight)records.push({...adaptEditionAlbum(edition.limelight),isLimelight:true});
+   for(const record of records)albumHistory.set(record.id,record);
+   shelfEditions.set(item.edition_number,{date:item.starts_on,albums:records});
+  }
+  if(document.querySelectorAll("main > section")[5]?.classList.contains("active"))renderArchiveShelf();
+  renderJournal();
+ }catch(err){console.warn("Cannot load The Shelf archive",err)}
+}
 function renderArchiveShelf(){
  const gateBox=document.getElementById("archiveGate"),body=document.getElementById("archiveBody");
  if(!gateBox||!body)return;
