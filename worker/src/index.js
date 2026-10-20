@@ -197,7 +197,7 @@ async function adminDraft(request,url,db,listener){
 async function knownAlbum(db,id){
  if(!/^[0-9]{5,20}$/.test(String(id||"")))return false;
  if(albums.has(String(id)))return true;
- await editionsSchema(db);
+ await publicationSchema(db);
  const found=await db.prepare("SELECT 1 AS found FROM scheduled_album_ids WHERE album_id=? LIMIT 1").bind(String(id)).first();
  return !!found;
 }
