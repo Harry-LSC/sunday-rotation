@@ -43,8 +43,6 @@
 .balance-fill.good{background:#317b55}.balance-fill.mid{background:#ce9a2a}.balance-fill.low{background:#b85d46}
 @media(max-width:720px){.balance-grid{grid-template-columns:1fr}}
 </style>
-<script>
-</script>
 <section class="admin-panel" id="panel-library" hidden>
 <div class="eyebrow">THE CLUB'S COLLECTION</div><h1>Record Library.</h1>
 <p class="intro">Your growing catalogue of listener suggestions, edition drafts and played albums. Includes who suggested each album and their comments. Nothing here publishes an edition.</p>
@@ -80,45 +78,9 @@ async function adminApi(path,method="GET",payload=null){
 }
 async function authenticateAdmin(token){
   adminToken=token;
-  const result=await adminApi("/admin/suggestions");
+  await adminApi("/admin/members");
   $("adminGate").hidden=true;$("adminWorkspace").hidden=false;
-  renderSuggestions(result.suggestions);
 }
-function renderSuggestions(items){
-  $("suggestionStatus").textContent=items.length?items.length+" albums in the inbox.":"No listener suggestions have arrived yet.";
-  $("suggestionList").replaceChildren();
-  items.forEach(item=>{
-    const wrap=document.createElement("div");wrap.className="card suggestion-item";
-    const title=document.createElement("h2");title.textContent=item.album+" — "+item.artist;wrap.append(title);
-    const info=document.createElement("p");info.className="muted";info.textContent=item.supporters+" supporter(s) · "+item.status;wrap.append(info);
-    const select=document.createElement("select");select.setAttribute("aria-label","Status for "+item.album);
-    ["pending","shortlisted","dismissed","featured"].forEach(v=>{const option=document.createElement("option");option.value=v;option.textContent=v[0].toUpperCase()+v.slice(1);option.selected=item.status===v;select.append(option)});
-    const button=document.createElement("button");button.textContent="Save decision";button.onclick=async()=>{
-      button.disabled=true;
-      try{await adminApi("/admin/suggestions","PUT",{suggestion_id:item.suggestion_id,status:select.value});await refreshSuggestions()}
-      catch(e){$("suggestionStatus").textContent="Could not save: "+e.message}
-      finally{button.disabled=false}
-    };
-    if(Array.isArray(item.reasons)&&item.reasons.length){
-      const reasons=document.createElement("div");reasons.className="muted";
-      item.reasons.forEach(entry=>{const p=document.createElement("p");p.textContent="“"+entry.reason+"” — "+entry.listener_name;reasons.append(p)});
-      wrap.append(reasons);
-    }
-    const use=document.createElement("button");use.textContent="Add to current draft";
-    use.onclick=()=>{
-      const free=rows.findIndex(x=>!x.artist&&!x.album);
-      if(free<0){$("suggestionStatus").textContent="This draft already has ten albums. Open Editions and clear a slot first.";return}
-      rows[free].artist=item.artist;rows[free].album=item.album;
-      draw();showPanel("editions");$("status").textContent="Added to Album "+(free+1)+". Use Find album to retrieve the artwork, then save your draft.";
-    };
-    wrap.append(select,button,use);$("suggestionList").append(wrap);
-  });
-}
-async function refreshSuggestions(){
-  try{const data=await adminApi("/admin/suggestions");renderSuggestions(data.suggestions)}
-  catch(e){$("suggestionStatus").textContent="Unable to fetch suggestions: "+e.message}
-}
-$("refreshSuggestions").onclick=refreshSuggestions;
 $("adminLogin").onsubmit=async e=>{
   e.preventDefault();$("adminGateStatus").textContent="Checking access…";
   try{await authenticateAdmin($("adminCredential").value.trim().toLowerCase());$("adminCredential").value="";await load()}
