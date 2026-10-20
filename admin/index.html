@@ -94,11 +94,12 @@ $("adminLogin").onsubmit=async e=>{
   }catch(e){$("adminGateStatus").textContent="This browser isn't authorized. Enter your private recovery key."}
 })();
 
-const blank=()=>({artist:"",album:"",genre:"",mood:"",year:null,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",listen_when:"",listen_for:"",why_here:"",description:""});
+const blank=()=>({artist:"",album:"",genre:"",mood:"",year:null,year_override:false,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",listen_when:"",listen_for:"",why_here:"",description:""});
 let rows=Array.from({length:10},blank),light=blank();
 const base="sr-admin-preview:";
 const escapeHTML=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
 function field(label,value,type,i,k){return '<div><label for="'+type+'-'+i+'-'+k+'">'+label+'</label><input id="'+type+'-'+i+'-'+k+'" data-type="'+type+'" data-index="'+i+'" data-key="'+k+'" value="'+escapeHTML(value)+'" placeholder="'+(k==="artist"?"Artist name":k==="album"?"Album title":"Any genre")+'"></div>'}
+function yearField(r,type,i){return '<div><label for="year-'+type+'-'+i+'">Original release year (editable)</label><input type="number" min="1850" max="2200" step="1" id="year-'+type+'-'+i+'" data-year-type="'+type+'" data-year-index="'+i+'" value="'+escapeHTML(r.year??"")+'" placeholder="e.g. 2008"></div>'}
 function editorialFields(r,type,i){
   const keys=[["description","Short album description"],["listen_when","Listen when"],["listen_for","Listen for"],["why_here","Why it is here"]];
   return '<details class="editorial"><summary>Edit sleeve notes and description</summary><div class="actions"><button type="button" class="generateNotes" data-type="'+type+'" data-index="'+i+'">✦ Generate Sleeve Notes</button><span class="muted">AI first draft · check before saving</span></div><div class="generationMessage" aria-live="polite"></div>'+
@@ -171,12 +172,13 @@ function updateBalanceMeters(){
 }
 
 function draw(){
-  $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+field("Mood (optional)",r.mood,"regular",i,"mood")+'</div>'+metadataCard(r,"regular",i)+editorialFields(r,"regular",i)+'</div>').join("");
-  $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+'</div>'+metadataCard(light,"light",0)+editorialFields(light,"light",0):"";
+  $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+field("Mood (optional)",r.mood,"regular",i,"mood")+yearField(r,"regular",i)+'</div>'+metadataCard(r,"regular",i)+editorialFields(r,"regular",i)+'</div>').join("");
+  $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+yearField(light,"light",0)+'</div>'+metadataCard(light,"light",0)+editorialFields(light,"light",0):"";
   updateGenreLights();
 }
 function collect(){
   document.querySelectorAll("input[data-type]").forEach(el=>{const target=el.dataset.type==="light"?light:rows[+el.dataset.index];target[el.dataset.key]=el.value.trim()});
+  document.querySelectorAll("[data-year-type]").forEach(el=>{const target=el.dataset.yearType==="light"?light:rows[+el.dataset.yearIndex];target.year=el.value.trim()?Number(el.value):null});
   document.querySelectorAll("[data-note-type]").forEach(el=>{const target=el.dataset.noteType==="light"?light:rows[+el.dataset.noteIndex];target[el.dataset.noteKey]=el.value.trim()});
 }
 async function fetchAlbum(type,i){
@@ -227,7 +229,7 @@ async function importAlbum(type,i,v,box){
     const tracks=(d.results||[]).filter(x=>x.wrapperType==="track"&&x.kind==="song"&&x.collectionId===v.collectionId);
     const ms=tracks.reduce((sum,t)=>sum+(Number(t.trackTimeMillis)||0),0);
     if(rec.artist!==artistBefore||rec.album!==albumBefore){box.textContent="Album fields changed. Search again.";return}
-    Object.assign(rec,{artist:v.artistName,album:v.collectionName,year:Number((v.releaseDate||"").slice(0,4))||null,minutes:ms?Math.round(ms/60000):null,track_count:tracks.length||null,cover_url:(v.artworkUrl100||"").replace(/100x100bb/g,"600x600bb"),source_url:v.collectionViewUrl||"",catalog_id:String(v.collectionId),metadata_source:"Apple Music"});
+    Object.assign(rec,{artist:v.artistName,album:v.collectionName,year:rec.year_override?rec.year:(Number((v.releaseDate||"").slice(0,4))||null),minutes:ms?Math.round(ms/60000):null,track_count:tracks.length||null,cover_url:(v.artworkUrl100||"").replace(/100x100bb/g,"600x600bb"),source_url:v.collectionViewUrl||"",catalog_id:String(v.collectionId),metadata_source:"Apple Music"});
     // Preserve curator-chosen genre; fill it only when empty.
     if(!rec.genre)rec.genre=v.primaryGenreName||"";
     draw();
@@ -302,6 +304,7 @@ document.addEventListener("click",e=>{
   const button=e.target.closest?.(".generateNotes");
   if(button)generateNotes(button);
 });
+document.addEventListener("input",e=>{const el=e.target;if(el.matches("[data-year-type]")){const target=el.dataset.yearType==="light"?light:rows[+el.dataset.yearIndex];target.year_override=true}});
 $("cards").addEventListener("input",()=>{collect();updateGenreLights()});$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
