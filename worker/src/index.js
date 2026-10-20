@@ -221,19 +221,26 @@ async function recordLibrary(request,db,listener){
       .bind(crypto.randomUUID(),key,artist,album,genre||null,year,note||null).run();
     return reply({saved:true});
   }
+  if(request.method==="PUT"){
+    const input=await parse(request);
+    if(typeof input?.suggestion_id!=="string"||!["pending","shortlisted","dismissed","featured"].includes(input.status))return error("Invalid moderation request");
+    await db.prepare("UPDATE suggested_albums SET status=?,updated_at=CURRENT_TIMESTAMP WHERE suggestion_id=?").bind(input.status,input.suggestion_id).run();
+    return reply({saved:true});
+  }
   if(request.method!=="GET")return error("Method not allowed",405);
-  const [suggestions,manual,drafts]=await Promise.all([
+  const [suggestions,manual,drafts,comments]=await Promise.all([
     db.prepare(`SELECT s.suggestion_id,s.artist,s.album,s.status,COUNT(c.listener_id) AS supporters
       FROM suggested_albums s LEFT JOIN suggestion_contributors c ON c.suggestion_id=s.suggestion_id
       GROUP BY s.suggestion_id LIMIT 1000`).all(),
     db.prepare("SELECT library_id,artist,album,genre,year,note FROM library_albums ORDER BY created_at DESC LIMIT 1000").all(),
-    db.prepare("SELECT starts_on,edition_number,payload_json FROM studio_drafts ORDER BY starts_on LIMIT 520").all()
+    db.prepare("SELECT starts_on,edition_number,payload_json FROM studio_drafts ORDER BY starts_on LIMIT 520").all(),
+    db.prepare("SELECT c.suggestion_id,c.reason,l.display_name FROM suggestion_contributors c JOIN listeners l ON l.listener_id=c.listener_id ORDER BY c.created_at LIMIT 10000").all()
   ]);
   const all=new Map();
   const add=(artist,album,extra)=>{
     if(!artist||!album)return;
     const key=albumKey(artist,album);
-    const entry=all.get(key)||{key,artist,album,genre:"",year:null,sources:[],editions:[],suggestion_status:null,supporters:0,note:""};
+    const entry=all.get(key)||{key,artist,album,genre:"",year:null,sources:[],editions:[],suggestion_status:null,supporters:0,note:"",reasons:[]};
     if(extra.genre&&!entry.genre)entry.genre=extra.genre;
     if(extra.year&&!entry.year)entry.year=extra.year;
     if(extra.note&&!entry.note)entry.note=extra.note;
@@ -242,8 +249,10 @@ async function recordLibrary(request,db,listener){
     if(extra.status){entry.suggestion_status=extra.status;entry.supporters=extra.supporters||0}
     all.set(key,entry);
   };
+  const bySuggestion=new Map();
+  for(const c of comments.results||[]){if(!bySuggestion.has(c.suggestion_id))bySuggestion.set(c.suggestion_id,[]);bySuggestion.get(c.suggestion_id).push({reason:c.reason||"",listener_name:c.display_name})}
   for(const x of manual.results||[])add(x.artist,x.album,{...x,source:"Manual"});
-  for(const x of suggestions.results||[])add(x.artist,x.album,{source:"Suggestion",status:x.status,supporters:x.supporters});
+  for(const x of suggestions.results||[]){add(x.artist,x.album,{source:"Suggestion",status:x.status,supporters:x.supporters});const rec=all.get(albumKey(x.artist,x.album));rec.reasons=bySuggestion.get(x.suggestion_id)||[];rec.suggestion_id=x.suggestion_id}
   for(const d of drafts.results||[]){
     let obj;try{obj=JSON.parse(d.payload_json)}catch{continue}
     for(const item of [...(Array.isArray(obj.albums)?obj.albums:[]),...(obj.limelight?[obj.limelight]:[])])
@@ -324,7 +333,7 @@ export default {
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
         else if(u.pathname==="/admin/members"&&request.method==="GET")res=await adminMembers(env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
-        else if(u.pathname==="/admin/library"&&["GET","POST"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
+        else if(u.pathname==="/admin/library"&&["GET","POST","PUT"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
         else if(u.pathname==="/admin/generate-notes"&&request.method==="POST")res=await generateSleeveNotes(request,env,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
