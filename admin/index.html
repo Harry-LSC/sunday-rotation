@@ -17,7 +17,6 @@
 <main>
 <nav class="admin-nav" aria-label="Admin sections">
 <button type="button" class="admin-tab active" data-panel="editions">Editions</button>
-<button type="button" class="admin-tab" data-panel="suggestions">Suggestions <span id="suggestionsCount"></span></button>
 <button type="button" class="admin-tab" data-panel="library">Record Library</button>
 <button type="button" class="admin-tab" data-panel="members">Members</button>
 <button type="button" class="admin-tab" data-panel="settings">Settings</button>
@@ -29,25 +28,29 @@
 <p class="muted date" id="dateRange"></p>
 <div class="toolbar"><button id="past">← Previous draft</button><button id="future">Next draft →</button><button id="newDraft">Start fresh</button></div>
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
-<div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div id="cards"></div>
+<div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
 <div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
 <div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div>
 </div>
-<section class="admin-panel" id="panel-suggestions" hidden>
-<div class="eyebrow">FROM THE CLUB</div><h1>Listener suggestions.</h1>
-<p class="intro">Real recommendations from registered listeners. Shortlist for later, dismiss, or mark as featured. No suggestion is automatically published.</p>
-<div class="toolbar"><button type="button" id="refreshSuggestions">Refresh suggestions ↻</button></div>
-<div id="suggestionStatus" role="status" class="muted">Loading…</div>
-<div id="suggestionList"></div>
-</section>
 
+<style>
+.balance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.balance-card{border:1px solid var(--line);padding:13px;background:#fffdfa}
+.balance-card strong{display:block;margin-bottom:5px}
+.balance-track{height:9px;border-radius:10px;background:#ddd9cf;overflow:hidden;margin:9px 0}
+.balance-fill{height:100%;border-radius:10px;transition:width .15s}
+.balance-fill.good{background:#317b55}.balance-fill.mid{background:#ce9a2a}.balance-fill.low{background:#b85d46}
+@media(max-width:720px){.balance-grid{grid-template-columns:1fr}}
+</style>
+<script>
+</script>
 <section class="admin-panel" id="panel-library" hidden>
 <div class="eyebrow">THE CLUB'S COLLECTION</div><h1>Record Library.</h1>
-<p class="intro">Your growing catalogue of listener suggestions, edition drafts and played albums. Suggestions remain in their own inbox. Nothing here publishes an edition.</p>
-<div class="toolbar"><input id="librarySearch" aria-label="Search records" placeholder="Search artist, album, genre or source" style="flex:2;min-width:180px"><select id="libraryFilter" aria-label="Filter records" style="flex:1;min-width:160px"><option value="">All records</option><option value="Published">Published</option><option value="Edition draft">Edition drafts</option><option value="Suggestion">Suggestions</option><option value="Manual">Manual additions</option></select><button type="button" id="libraryRefresh">Refresh ↻</button><button type="button" id="libraryExport">Export CSV ↓</button></div>
+<p class="intro">Your growing catalogue of listener suggestions, edition drafts and played albums. Includes who suggested each album and their comments. Nothing here publishes an edition.</p>
+<div class="toolbar"><input id="librarySearch" aria-label="Search records" placeholder="Search artist, album, genre or source" style="flex:2;min-width:180px"><select id="libraryFilter" aria-label="Filter records" style="flex:1;min-width:160px"><option value="">All records</option><option value="unpublished">Not yet published</option><option value="Published">Published</option><option value="Edition draft">Edition drafts</option><option value="Suggestion">Suggestions</option><option value="Manual">Manual additions</option></select><select id="librarySort" aria-label="Sort records" style="flex:1;min-width:160px"><option value="status">Published first</option><option value="artist">Artist A–Z</option><option value="year">Year newest first</option><option value="supporters">Most suggested</option></select><button type="button" id="libraryRefresh">Refresh ↻</button><button type="button" id="libraryExport">Export CSV ↓</button></div>
 <p id="libraryStatus" class="muted" role="status">Open this tab to load the catalogue.</p>
-<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px;background:#f8f5ee;font-size:13px" id="libraryTable"><thead><tr><th>Artist</th><th>Album</th><th>Genre</th><th>Year</th><th>Provenance</th><th>Edition(s)</th><th>Use</th></tr></thead><tbody id="libraryBody"></tbody></table></div>
+<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px;background:#f8f5ee;font-size:13px" id="libraryTable"><thead><tr><th>Artist</th><th>Album</th><th>Genre</th><th>Year</th><th>Provenance</th><th>Edition(s)</th><th>Suggestions</th><th>Use</th></tr></thead><tbody id="libraryBody"></tbody></table></div>
 <div class="card"><h2>Add a record</h2><p class="muted">For curator discoveries not submitted by listeners. Artist and title are used to detect duplicates.</p>
 <form id="libraryAdd"><div class="fields"><div><label>Artist<input name="artist" required maxlength="120"></label></div><div><label>Album<input name="album" required maxlength="180"></label></div><div><label>Genre<input name="genre" maxlength="120"></label></div><div><label>Year<input name="year" type="number" min="1850" max="2200"></label></div></div><div class="actions"><button class="primary" type="submit">Add to library</button></div></form></div>
 </section>
@@ -129,7 +132,7 @@ $("adminLogin").onsubmit=async e=>{
   }catch(e){$("adminGateStatus").textContent="This browser isn't authorized. Enter your private recovery key."}
 })();
 
-const blank=()=>({artist:"",album:"",genre:"",year:null,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",listen_when:"",listen_for:"",why_here:"",description:""});
+const blank=()=>({artist:"",album:"",genre:"",mood:"",year:null,minutes:null,cover_url:"",source_url:"",catalog_id:null,track_count:null,metadata_source:"",listen_when:"",listen_for:"",why_here:"",description:""});
 let rows=Array.from({length:10},blank),light=blank();
 const base="sr-admin-preview:";
 const escapeHTML=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
@@ -175,8 +178,37 @@ function updateGenreLights(){
  });
  $("genreCount").textContent=active.length+" of 10 chosen";
 }
+
+function updateBalanceMeters(){
+ const active=rows.filter(r=>r.artist.trim()&&r.album.trim());
+ const genres=active.map(r=>genreGroup(r.genre)).filter(Boolean);
+ const decades=active.map(r=>Number(r.year)).filter(y=>y>=1900&&y<=2100).map(y=>Math.floor(y/10)*10);
+ const moods=active.map(r=>String(r.mood||"").trim().toLowerCase()).filter(Boolean);
+ const uniq=a=>new Set(a).size;
+ const meters=[
+  {name:"Genres",values:genres,target:4,missing:active.length-genres.length,tip:"Try a genre that isn't represented yet."},
+  {name:"Decades",values:decades,target:3,missing:active.length-decades.length,tip:"Try an album from another decade."},
+  {name:"Moods",values:moods,target:3,missing:active.length-moods.length,tip:"Add a mood tag, then consider a contrasting listening feel."}
+ ];
+ const holder=$("balanceMeters");if(!holder)return;
+ holder.replaceChildren();
+ for(const x of meters){
+  const n=uniq(x.values),pct=Math.min(100,Math.round(n/x.target*100));
+  const level=!active.length||!x.values.length?"low":n>=x.target?"good":"mid";
+  const card=document.createElement("div");card.className="balance-card";
+  const head=document.createElement("strong");head.textContent=x.name;
+  const detail=document.createElement("div");detail.className="muted";
+  detail.textContent=n+" distinct "+(x.name==="Decades"?"decades":x.name.toLowerCase())+" · "+x.values.length+"/"+active.length+" tagged";
+  const bar=document.createElement("div");bar.className="balance-track";bar.setAttribute("role","meter");bar.setAttribute("aria-label",x.name+" diversity");bar.setAttribute("aria-valuemin","0");bar.setAttribute("aria-valuemax",String(x.target));bar.setAttribute("aria-valuenow",String(Math.min(n,x.target)));
+  const fill=document.createElement("div");fill.className="balance-fill "+level;fill.style.width=pct+"%";bar.append(fill);
+  const tip=document.createElement("div");tip.className="muted";tip.textContent=level==="good"?"Good variety so far.":x.missing?"Missing metadata on "+x.missing+" album(s).":x.tip;
+  card.append(head,detail,bar,tip);holder.append(card);
+ }
+ $("balanceAdvice").textContent=active.length+" of 10 selected. These are diversity prompts, not scores or requirements; a cohesive selection can deliberately repeat a genre or mood.";
+}
+
 function draw(){
-  $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+'</div>'+metadataCard(r,"regular",i)+editorialFields(r,"regular",i)+'</div>').join("");
+  $("cards").innerHTML=rows.map((r,i)=>'<div class="card"><div class="cardtop"><strong>Album '+(i+1)+'</strong><span class="num">'+String(i+1).padStart(2,"0")+'</span></div><div class="fields">'+field("Genre",r.genre,"regular",i,"genre")+field("Artist",r.artist,"regular",i,"artist")+field("Album",r.album,"regular",i,"album")+field("Mood (optional)",r.mood,"regular",i,"mood")+'</div>'+metadataCard(r,"regular",i)+editorialFields(r,"regular",i)+'</div>').join("");
   $("lightFields").innerHTML=$("addLight").checked?'<div class="fields">'+field("Category",light.genre||"Limelight","light",0,"genre")+field("Artist",light.artist,"light",0,"artist")+field("Album",light.album,"light",0,"album")+'</div>'+metadataCard(light,"light",0)+editorialFields(light,"light",0):"";
   updateGenreLights();
 }
@@ -348,13 +380,24 @@ async function refreshLibrary(){
 }
 function renderLibrary(){
   const q=$("librarySearch").value.trim().toLocaleLowerCase(),filter=$("libraryFilter").value;
-  const shown=libraryItems.filter(a=>(!filter||a.sources.includes(filter))&&
-    [a.artist,a.album,a.genre,(a.sources||[]).join(" ")].join(" ").toLocaleLowerCase().includes(q));
+  const shown=libraryItems.filter(a=>(!filter||(filter==="unpublished"?!a.sources.includes("Published"):a.sources.includes(filter)))&&
+    [a.artist,a.album,a.genre,(a.sources||[]).join(" "),(a.reasons||[]).map(r=>r.reason+" "+r.listener_name).join(" ")].join(" ").toLocaleLowerCase().includes(q));
+  const sort=$("librarySort").value;
+  shown.sort((a,b)=>sort==="artist"?a.artist.localeCompare(b.artist)||a.album.localeCompare(b.album):sort==="year"?(Number(b.year)||0)-(Number(a.year)||0):sort==="supporters"?(b.supporters||0)-(a.supporters||0):Number(b.sources.includes("Published"))-Number(a.sources.includes("Published"))||Number(b.sources.includes("Suggestion"))-Number(a.sources.includes("Suggestion"))||a.artist.localeCompare(b.artist));
   const body=$("libraryBody");body.replaceChildren();
   for(const a of shown){
     const row=document.createElement("tr");
     const values=[a.artist,a.album,a.genre||"—",a.year||"—",(a.sources||[]).join(", ")+(a.suggestion_status?" · "+a.suggestion_status:""),(a.editions||[]).map(n=>"#"+n).join(", ")||"—"];
     for(const v of values){const td=document.createElement("td");td.textContent=v;row.append(td)}
+    const info=document.createElement("td");
+    if(a.suggestion_id){
+      const select=document.createElement("select");select.setAttribute("aria-label","Suggestion status for "+a.album);select.style.minWidth="125px";
+      ["pending","shortlisted","featured","dismissed"].forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;o.selected=a.suggestion_status===v;select.append(o)});
+      select.onchange=async()=>{try{await adminApi("/admin/library","PUT",{suggestion_id:a.suggestion_id,status:select.value});a.suggestion_status=select.value;$("libraryStatus").textContent="Suggestion updated."}catch(e){$("libraryStatus").textContent=e.message}};
+      info.append(select);
+    }
+    for(const comment of a.reasons||[]){const p=document.createElement("p");p.className="muted";p.textContent=comment.listener_name+(comment.reason?" — “"+comment.reason+"”":" (suggested)");info.append(p)}
+    row.append(info);
     const td=document.createElement("td"),b=document.createElement("button");b.type="button";b.textContent="Add to draft";
     b.onclick=()=>{
       collect();const i=rows.findIndex(x=>!x.artist&&!x.album);
@@ -364,9 +407,9 @@ function renderLibrary(){
     };
     td.append(b);row.append(td);body.append(row);
   }
-  $("libraryStatus").textContent=shown.length+" displayed · "+libraryItems.length+" unique records. Edition 1 is the live published selection; other edition numbers indicate saved drafts, not publication.";
+  $("libraryStatus").textContent=shown.length+" displayed · "+libraryItems.length+" unique records. Published records appear first by default; later edition numbers may indicate drafts, not publication.";
 }
-$("librarySearch").oninput=renderLibrary;$("libraryFilter").onchange=renderLibrary;
+$("librarySearch").oninput=renderLibrary;$("libraryFilter").onchange=renderLibrary;$("librarySort").onchange=renderLibrary;
 $("libraryRefresh").onclick=refreshLibrary;
 $("libraryExport").onclick=()=>{
   const cells=[["Artist","Album","Genre","Year","Sources","Editions","Suggestion status","Supporters"],
