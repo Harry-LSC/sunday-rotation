@@ -370,11 +370,13 @@ function redrawEdition(){
 }
 function wireEditionNavigation(){
  const prev=document.querySelector("#previousEdition"),next=document.querySelector("#nextEdition");
- if(prev)prev.onclick=()=>browseEdition(1);
- if(next)next.onclick=()=>browseEdition(activeEdition);
+ if(prev)prev.onclick=()=>browseEdition(browsingEdition-1);
+ if(next)next.onclick=()=>browseEdition(browsingEdition+1);
 }
 function browseEdition(n){
  if(n<1||n>activeEdition)return;
+ if(n<activeEdition&&!account){gate(true);return;}
+ if(n<activeEdition&&!shelfEditions.has(n)){loadArchiveShelf();return;}
  browsingEdition=n;
  albums=n===activeEdition?currentEditionAlbums.slice():(shelfEditions.get(n)?.albums|| (n===1?editionOneAlbums:[])).slice();
  if(!albums.length)return;
