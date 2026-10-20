@@ -239,11 +239,14 @@ async function publicationRead(db,url){
  const result=await db.prepare("SELECT payload_json,starts_on,edition_number FROM scheduled_editions WHERE starts_on<=? ORDER BY starts_on DESC LIMIT 1").bind(date).first();
  return reply(result?{found:true,edition:JSON.parse(result.payload_json),effective_date:date}:{found:false,legacy_edition:1,effective_date:date});
 }
-async function publicationArchive(db){
+async function publicationArchive(db,listener){
+ if(!listener)return error("Membership required",401);
  await publicationSchema(db);
  const today=berlinDate();
- const found=await db.prepare("SELECT starts_on,edition_number FROM scheduled_editions WHERE starts_on<? ORDER BY starts_on DESC LIMIT 100").bind(today).all();
- return reply({editions:[{starts_on:"2026-10-18",edition_number:1,legacy:true},...(found.results||[])]});
+ const rows=await db.prepare("SELECT starts_on,edition_number,payload_json FROM scheduled_editions WHERE starts_on<? ORDER BY starts_on DESC LIMIT 100").bind(today).all();
+ const editions=(rows.results||[]).map(r=>({starts_on:r.starts_on,edition_number:r.edition_number,edition:JSON.parse(r.payload_json)}));
+ // Edition 1 is bundled into the public site's initial catalogue and can be rendered without duplicating artwork in D1.
+ return reply({editions,legacy_edition_1:{starts_on:"2026-10-18",ends_on:"2026-10-24",available:today>"2026-10-24"}});
 }
 async function adminSchedule(request,url,db,listener){
  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
@@ -398,8 +401,6 @@ export default {
         res=reply({ok:true,service:"sunday-rotation-api",database:"connected",deployment_test:"github-auto-2026-10-19"});
       }else if(u.pathname==="/editions/current"&&request.method==="GET"){
         res=await publicationRead(env.DB,u);
-      }else if(u.pathname==="/editions/archive"&&request.method==="GET"){
-        res=await publicationArchive(env.DB);
       }else if(u.pathname==="/members/count"&&request.method==="GET"){
         const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM listeners").first();
         res=reply({members:Number(count?.total||0)});
@@ -409,6 +410,7 @@ export default {
         const listener=await authenticated(request,env.DB);
         if(!listener)res=error("Authentication required",401);
         else if(u.pathname==="/me"&&request.method==="GET")res=reply({listener});
+        else if(u.pathname==="/editions/archive"&&request.method==="GET")res=await publicationArchive(env.DB,listener);
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
         else if(u.pathname==="/admin/members"&&request.method==="GET")res=await adminMembers(env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
