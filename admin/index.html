@@ -30,7 +30,7 @@
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
+<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div>
 <section class="card" id="previewPanel" hidden style="margin-top:18px">
  <div class="cardtop"><div><div class="eyebrow">SAFE DRY RUN · NO PUBLICATION</div><h2 id="previewHeading">Sunday preview</h2></div><button type="button" id="closePreview">Close</button></div>
  <p class="muted" id="previewMessage"></p>
@@ -80,6 +80,26 @@
 const $=id=>document.getElementById(id);
 const API="https://sunday-rotation-api.linealsportchamp.workers.dev";
 let adminToken=null;
+
+$("testWorker").onclick=async()=>{
+ const button=$("testWorker"),target=$("workerTestResults");
+ button.disabled=true;target.textContent="Checking Cloudflare from this browser…";
+ const tests=[["Health","/health",false],["Published edition","/editions/current",false],["Members-only archive","/editions/archive",true]];
+ const messages=[];
+ for(const [label,path,auth] of tests){
+  try{
+   const response=await fetch(API+path,{cache:"no-store",headers:auth?{"Authorization":"Bearer "+adminToken}:{}});
+   const value=await response.json().catch(()=>({}));
+   let detail=response.ok?"HTTP "+response.status:"HTTP "+response.status+(value.error?" · "+value.error:"");
+   if(response.ok&&path==="/health")detail+=" · "+(value.ok&&value.database==="connected"?"DB connected":"Unexpected response");
+   if(response.ok&&path==="/editions/current")detail+=" · "+(value.found?"Edition "+value.edition?.edition_number:"Legacy edition "+(value.legacy_edition||"?"));
+   if(response.ok&&path==="/editions/archive")detail+=" · "+(value.editions?.length||0)+" stored editions";
+   messages.push(label+": "+detail);
+  }catch(err){messages.push(label+": Unreachable from this browser ("+(err?.message||"network error")+")")}
+ }
+ target.textContent=messages.join(" | ");button.disabled=false;
+};
+
 async function adminApi(path,method="GET",payload=null){
   const res=await fetch(API+path,{method,headers:{"Authorization":"Bearer "+adminToken,...(payload?{"Content-Type":"application/json"}:{})},body:payload?JSON.stringify(payload):undefined});
   const value=await res.json().catch(()=>({}));
