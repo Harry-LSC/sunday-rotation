@@ -257,7 +257,7 @@ el("memberJoin").onsubmit=async event=>{
   try{
     const created=await call("/register","POST",{display_name:el("listenerName").value.trim()},null);
     token=created.credential; account={listener_id:created.listener_id,display_name:created.display_name};
-    localSave();showAccount();await syncJournal();
+    localSave();showAccount();await loadArchiveShelf();await syncJournal();
     el("memberJoin").hidden=true;el("showRestore").hidden=true;
     el("memberCreated").hidden=false;el("newListenerId").textContent=created.listener_id;el("credentialView").textContent=token;
   }catch(e){message("Could not register: "+e.message)}finally{button.disabled=false;button.textContent="Create my journal →"}
@@ -376,7 +376,8 @@ function wireEditionNavigation(){
 function browseEdition(n){
  if(n<1||n>activeEdition)return;
  browsingEdition=n;
- albums=n===1?editionOneAlbums.slice():currentEditionAlbums.slice();
+ albums=n===activeEdition?currentEditionAlbums.slice():(shelfEditions.get(n)?.albums|| (n===1?editionOneAlbums:[])).slice();
+ if(!albums.length)return;
  redrawEdition();
 }
 
