@@ -186,14 +186,19 @@ async function fetchAlbum(type,i){
   if(!rec.artist||!rec.album){box.textContent="Enter both artist and album first.";return}
   box.textContent="Searching album catalogue…";
   try{
-    const query=encodeURIComponent(rec.artist+" "+rec.album);
-    const res=await fetch("https://itunes.apple.com/search?term="+query+"&entity=album&media=music&limit=15&country=DE");
-    if(!res.ok)throw Error("Catalogue request failed");
-    const data=await res.json();
+    const terms=[rec.artist+" "+rec.album,rec.album,rec.artist];
+    const searches=await Promise.all(terms.map(async term=>{
+      const res=await fetch("https://itunes.apple.com/search?term="+encodeURIComponent(term)+"&entity=album&media=music&limit=100&country=DE");
+      if(!res.ok)throw Error("Catalogue request failed");
+      return res.json();
+    }));
+    const results=new Map();
+    for(const data of searches)for(const item of data.results||[])if(item.collectionId)results.set(item.collectionId,item);
+    const data={results:[...results.values()]};
     const norm=s=>String(s||"").toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").replace(/[^a-z0-9]/g,"");
     const items=(data.results||[]).filter(v=>v.collectionType==="Album"&&norm(v.artistName).includes(norm(rec.artist).slice(0,8))).sort((a,b)=>
       Number(norm(b.collectionName)===norm(rec.album))-Number(norm(a.collectionName)===norm(rec.album)));
-    if(!items.length){box.textContent="No confident album match. Check the spelling or enter another edition manually.";return}
+    if(!items.length){box.textContent="No matching album found in the German Apple catalogue. Try the original title or a deluxe edition; the draft remains editable.";return}
     box.innerHTML='<div class="match-title">Choose the correct release (do not automatically accept a remaster):</div>'+items.slice(0,6).map(v=>'<button type="button" class="match" data-id="'+v.collectionId+'"><img src="'+escapeHTML(v.artworkUrl100||"")+'" alt=""><span><strong>'+escapeHTML(v.collectionName)+'</strong><small>'+escapeHTML(v.artistName)+' · '+(v.releaseDate||"").slice(0,4)+' · '+escapeHTML(v.primaryGenreName||"")+'</small></span><span>Use ↗</span></button>').join("");
     box.querySelectorAll(".match").forEach(btn=>btn.onclick=()=>importAlbum(type,i,items.find(v=>String(v.collectionId)===btn.dataset.id),box));
   }catch(e){box.textContent="Lookup unavailable on this browser: "+e.message+". Your draft is still editable."}
