@@ -30,7 +30,17 @@
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
+<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div>
+<section class="card" id="previewPanel" hidden style="margin-top:18px">
+ <div class="cardtop"><div><div class="eyebrow">SAFE DRY RUN · NO PUBLICATION</div><h2 id="previewHeading">Sunday preview</h2></div><button type="button" id="closePreview">Close</button></div>
+ <p class="muted" id="previewMessage"></p>
+ <div class="toolbar">
+  <label>Simulated time (Europe/Berlin)<select id="previewTime"><option value="before">Saturday 24 Oct · 23:59</option><option value="after" selected>Sunday 25 Oct · 00:00</option><option value="morning">Sunday 25 Oct · 09:00</option></select></label>
+ </div>
+ <div id="previewChecks"></div>
+ <div id="previewCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px"></div>
+ <p class="muted">Preview only. Does not change the public website, database, scheduled editions, ratings or listener journals.</p>
+</section>
 <div class="footer"><p class="muted"><strong>Planned next:</strong> secure admin sign-in, editorial draft notes, validation, and Cloudflare scheduling. Album matching is now available in this browser. Listeners won't see unfinished editions.</p></div>
 </div>
 
@@ -420,4 +430,58 @@ async function refreshMembers(){
     }
   }catch(e){$("membersStatus").textContent="Could not load members: "+e.message}
 }
+
+function validatePreview(d){
+ const issues=[];
+ if(!Array.isArray(d.albums)||d.albums.length!==10)issues.push("Ten regular slots are required.");
+ const seen=new Set();
+ for(const [i,r] of (d.albums||[]).entries()){
+  if(!r.artist?.trim()||!r.album?.trim())issues.push("Album "+(i+1)+" needs both artist and title.");
+  if(!r.cover_url?.trim())issues.push("Album "+(i+1)+" is missing cover artwork.");
+  for(const k of ["description","listen_when","listen_for","why_here"])if(!r[k]?.trim())issues.push("Album "+(i+1)+" is missing "+k.replaceAll("_"," ")+".");
+  const key=(r.artist+"|"+r.album).toLowerCase().trim();
+  if(seen.has(key))issues.push("Repeated album in slot "+(i+1)+".");seen.add(key);
+ }
+ if(d.limelight&&(!d.limelight.artist?.trim()||!d.limelight.album?.trim()||!d.limelight.cover_url))issues.push("Limelight is incomplete.");
+ return issues;
+}
+function renderSundayPreview(){
+ const d=getData(),time=$("previewTime").value;
+ const ready=validatePreview(d);
+ const before=time==="before";
+ $("previewHeading").textContent=(before?"Edition 1 (still live)":"Edition "+d.edition_number+" — "+d.starts_on);
+ $("previewMessage").textContent=before?
+  "At 23:59 the previous edition should still be visible. Its original albums and journal must remain unchanged.":
+  "Simulated "+(time==="morning"?"Sunday morning":"Sunday midnight")+" display. This shows the current unsaved form values and is NOT the public website.";
+ $("previewChecks").replaceChildren();
+ const checks=[
+  ["Edition complete",ready.length===0,ready.length?ready.join(" · "):"Ten albums, cover art and all four sleeve-note fields present."],
+  ["Time boundary",true,before?"Previous edition remains current.":"New edition becomes current only when valid and scheduled."],
+  ["Archive expectation",true,before?"Edition 1 remains current.":"Edition 1 should remain available in the archive."],
+  ["Actual publication",false,"Not implemented or enabled; journal, rating and score migration still required."]
+ ];
+ for(const [name,ok,detail] of checks){
+   const p=document.createElement("p");p.style.margin="9px 0";
+   const strong=document.createElement("strong");strong.textContent=(ok?"✓ ":"⚠ ")+name+": ";
+   p.append(strong,document.createTextNode(detail));$("previewChecks").append(p);
+ }
+ const cards=$("previewCards");cards.replaceChildren();
+ if(before){const p=document.createElement("p");p.textContent="Edition 1 is the current public catalogue before midnight. Select a Sunday time to preview the new shelf.";cards.append(p);return}
+ for(const r of [...d.albums,...(d.limelight?[d.limelight]:[])]){
+  const card=document.createElement("div");card.style.cssText="background:#fffdfa;border:1px solid #cdc9bf;padding:12px;min-width:0";
+  if(r.cover_url){const img=document.createElement("img");img.src=r.cover_url;img.alt="";img.loading="lazy";img.style.cssText="width:100%;aspect-ratio:1;object-fit:cover";img.onerror=()=>{img.style.opacity=".2";img.title="Artwork failed to load"};card.append(img)}
+  const h=document.createElement("h3");h.style.cssText="font:600 20px Georgia,serif;margin:8px 0";h.textContent=r.album||"(Missing album)";
+  const a=document.createElement("p");a.style.cssText="font-size:13px;margin:4px 0";a.textContent=r.artist||"(Missing artist)";
+  const m=document.createElement("p");m.className="muted";m.textContent=[r.genre,r.year,r.minutes?r.minutes+" min":""].filter(Boolean).join(" · ");
+  card.append(h,a,m);
+  const details=document.createElement("details"),summary=document.createElement("summary");summary.textContent="Preview sleeve notes";details.append(summary);
+  for(const [label,key] of [["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
+   const p=document.createElement("p"),b=document.createElement("strong");b.textContent=label+": ";p.style.cssText="font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere";p.append(b,document.createTextNode(r[key]||"(Missing)"));details.append(p)
+  }
+  card.append(details);cards.append(card);
+ }
+}
+$("previewSunday").onclick=()=>{collect();$("previewPanel").hidden=false;renderSundayPreview();$("previewPanel").scrollIntoView({behavior:"smooth",block:"start"})};
+$("previewTime").onchange=renderSundayPreview;
+$("closePreview").onclick=()=>{$("previewPanel").hidden=true};
 </script></html>
