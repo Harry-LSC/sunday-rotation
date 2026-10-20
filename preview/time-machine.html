@@ -36,13 +36,13 @@ function repairArchiveCovers(){
 function activeEdition(){const instant=times.find(x=>x[0]===state.time)[2];return formatBerlin.format(new Date(instant))>="2026-10-25"?2:1}
 function data(n){return n===1?db.one:db.two}
 function rec(n){const x=data(n);return [...x.albums,...(x.limelight?[x.limelight]:[])]}
-function switchTime(k){state.time=k;state.browse=activeEdition();state.selected=0;render()}
+function switchTime(k){state.time=k;state.browse=activeEdition();state.selected=0;state.archivedRecord=null;render()}
 function chooseTab(k){state.tab=k;state.archivedRecord=null;render()}
 function setBrowse(n){if(n<1||n>activeEdition())return;state.browse=n;state.selected=0;render()}
 function meta(r){return [r.genre,r.year,r.minutes?r.minutes+" min":null].filter(Boolean).map(esc).join(" · ")}
 function cards(records,withLimelight=true){return '<div class="shelf">'+records.map((r,i)=>'<button class="album '+(withLimelight&&i===10?'limelight':'')+'" onclick="pick('+i+')" type="button">'+(r.cover_url?'<img loading="lazy" src="'+esc(r.cover_url)+'" alt="">':'<div style="aspect-ratio:1;background:#dfdacd"></div>')+(i===10?'<span class="pill">In the Limelight</span>':'')+'<strong>'+esc(r.album)+'</strong><span class="text">'+esc(r.artist)+'</span><span class="text muted">'+meta(r)+'</span><span class="text">'+esc(r.hook||"")+'</span></button>').join('')+'</div>'}
-function pick(i){state.selected=i;state.tab=2;state.archivedRecord=null;render()}
-function openArchived(i){state.archivedRecord=i;state.tab=5;render()}
+function pick(i){if(state.browse<activeEdition()){openArchived(i);return}state.selected=i;state.tab=2;state.archivedRecord=null;render()}
+function openArchived(i){if(activeEdition()<=1)return;state.archivedRecord=i;state.tab=5;render()}
 function detail(r){return '<div class="details detailgrid">'+(r.cover_url?'<img src="'+esc(r.cover_url)+'" alt="">':'<div></div>')+'<div>'+(r===db.two.limelight?'<span class="pill">In the Limelight</span>':'')+'<h2>'+esc(r.album)+'</h2><p>'+esc(r.artist)+'</p><p class="muted">'+meta(r)+'</p><h3>'+esc(r.hook||"")+'</h3><p class="notes">'+esc(r.description||"")+'</p>'+[["Listen when",r.listen_when],["Listen for",r.listen_for],["Why it’s here",r.why_here]].map(([title,body])=>'<h3>'+title+'</h3><p class="notes">'+esc(body||"")+'</p>').join('')+'</div></div>'}
 function render(){
  const edition=activeEdition();
