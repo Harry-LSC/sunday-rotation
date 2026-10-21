@@ -26,6 +26,12 @@ const status=document.getElementById('status');status.textContent='Preparing iso
 try{
 const res=await fetch('../index.html?integration='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('Site source HTTP '+res.status);
 let html=await res.text();
+/* Timeless editorial copy: 10 regular albums, optionally one Limelight. */
+html=html.replace('Ten records for the week ahead.','Records for the week ahead.')
+ .replace('10 albums across all genres and moods','A selection across genres and moods')
+ .replace('Ten different starting points.','Different starting points.')
+ .replace('Preview of all ten albums in this week’s selection','Preview of the regular albums in this week’s selection');
+
 if(!html.includes('const ENABLE_EDITION_LOADER=false;')||!html.includes('loadPublishedEdition();'))throw Error('Production adapter changed: stopping rather than guessing.');
 const isE2=scenarios[document.getElementById('at').value];
 const fixtures=await Promise.all(sample.map(resolveArtwork));
