@@ -497,6 +497,7 @@ async function loadPublishedEdition(){
   if(edition.limelight)next.push({...adaptEditionAlbum(edition.limelight),isLimelight:true});
   if(next.length>11)throw Error("Too many records in edition");
   if(next.some(a=>!a.id||!a.cover||!a.title||!a.artist))throw Error("Incomplete published edition");
+  if(activeEdition===edition.edition_number)return; // Do not reset reading, filters or journal when unchanged.
   next.forEach(a=>albumHistory.set(a.id,a));
   activeEdition=edition.edition_number||2;
   currentEditionAlbums=next.slice();
@@ -507,6 +508,10 @@ async function loadPublishedEdition(){
  }catch(e){console.warn("Publication endpoint failed; keeping existing edition",e)}
 }
 loadPublishedEdition();
+// Publication is date-based in Cloudflare. A foreground tab should also cross Sundays
+// without needing a manual refresh. Rechecks do not mutate a journal or draft.
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadPublishedEdition()});
+setInterval(()=>{if(!document.hidden)loadPublishedEdition()},60000);
 
 })();
 </script></html>
