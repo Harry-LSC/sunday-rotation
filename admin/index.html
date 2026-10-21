@@ -540,7 +540,11 @@ function previewRecord(r,idx){
  for(const [label,key] of [["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
   const heading=document.createElement("strong");heading.textContent=label;const p=document.createElement("p");
   // Preserve actual prose and prevent HTML injection; asterisks remain source text.
-  p.textContent=r[key]||"(Missing)";
+  const value=r[key]||"(Missing)";
+  if(key==="why_here"&&value.includes("*")){
+   const parts=value.split(/(\\*[^*\\n]+\\*)/g);
+   for(const part of parts){if(/^\\*[^*\\n]+\\*$/.test(part)){const em=document.createElement("em");em.textContent=part.slice(1,-1);p.append(em)}else p.append(document.createTextNode(part))}
+  }else p.textContent=value;
   details.append(heading,p);
  }
  card.append(details);return card;
@@ -549,7 +553,9 @@ function renderSundayPreview(){
  const d=savedSundayPreview,time=$("previewTime").value,before=time==="before";
  const hero=$("srFinalHero"),cards=$("previewCards"),checks=$("previewChecks");hero.replaceChildren();cards.replaceChildren();checks.replaceChildren();
  if(!d){$("previewHeading").textContent="Sunday preview";$("previewMessage").textContent="Load the saved Cloudflare edition first.";return}
- $("previewHeading").textContent=before?"Edition 1 — Saturday 24 October":"Edition "+d.edition_number+" — Sunday 25 October";
+ const startDate=new Date(d.starts_on+"T12:00:00Z");
+ const displayDate=(offset)=>{const day=new Date(startDate.getTime()+offset*86400000);return day.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric",timeZone:"UTC"})};
+ $("previewHeading").textContent=before?"Previous edition — "+displayDate(-1):"Edition "+d.edition_number+" — Sunday "+displayDate(0);
  $("previewMessage").textContent=before?"The live Edition 1 remains visible at 23:59 on Saturday. No preview draft is published early.":"This is the saved Cloudflare draft, presented in the intended Sunday layout. It is a preview, not a publication.";
  if(before){const p=document.createElement("p");p.textContent="Edition 1 is still live. At midnight, only a separately approved and scheduled edition can replace it.";hero.append(p);return}
  const records=[...d.albums,...(d.limelight?[d.limelight]:[])];
