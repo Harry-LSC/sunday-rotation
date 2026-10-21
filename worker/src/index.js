@@ -248,6 +248,18 @@ async function publicationArchive(db,listener){
  // Edition 1 is bundled into the public site's initial catalogue and can be rendered without duplicating artwork in D1.
  return reply({editions,legacy_edition_1:{starts_on:"2026-10-18",ends_on:"2026-10-24",available:today>"2026-10-24"}});
 }
+async function validateSavedPublication(url,db,listener){
+ if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+ const date=url.searchParams.get("starts_on");
+ if(editionNumberFromDate(date)===null||date<="2026-10-18")return error("Choose a valid future edition",400);
+ await editionsSchema(db);
+ const saved=await db.prepare("SELECT payload_json,version,updated_at FROM studio_drafts WHERE starts_on=?").bind(date).first();
+ if(!saved)return reply({valid:false,starts_on:date,issues:["No saved Cloudflare draft exists for this edition."]});
+ let edition;
+ try{edition=checkedForPublication(JSON.parse(saved.payload_json),date)}
+ catch(e){return reply({valid:false,starts_on:date,saved_version:saved.version,issues:[e.message]})}
+ return reply({valid:true,starts_on:date,saved_version:saved.version,saved_at:saved.updated_at,regular_albums:edition.albums.length,limelight:!!edition.limelight,total_records:edition.albums.length+(edition.limelight?1:0),issues:[],notice:"Validation only: nothing scheduled or published."});
+}
 async function adminSchedule(request,url,db,listener){
  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
  if(request.method!=="POST")return error("Method not allowed",405);
@@ -416,6 +428,7 @@ export default {
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
         else if(u.pathname==="/admin/library"&&["GET","POST","PUT"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
+        else if(u.pathname==="/admin/validate-publication"&&request.method==="GET")res=await validateSavedPublication(u,env.DB,listener);
         else if(u.pathname==="/admin/schedule"&&request.method==="POST")res=await adminSchedule(request,u,env.DB,listener);
         else if(u.pathname==="/admin/generate-notes"&&request.method==="POST")res=await generateSleeveNotes(request,env,listener);
         else if(u.pathname==="/journal"&&["GET","PUT"].includes(request.method))res=await journal(request,env.DB,listener);
