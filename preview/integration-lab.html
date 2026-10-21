@@ -42,18 +42,21 @@ shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
 __labTwo.forEach(r=>albumHistory.set(r.id,r));
 }else{activeEdition=1;browsingEdition=1;albums=editionOneAlbums.slice();currentEditionAlbums=albums.slice();}
 redrawEdition();wireEditionNavigation();renderArchiveShelf();renderJournal();
-/* Show the optional eleventh album as a distinct editorial feature, not as a standard record. */
+/* Standard editions remain ten covers; only a flagged eleventh record gets Limelight. Keep the desktop feature immediately beneath the collage, retain mobile layout. */
 if(${isE2}){
  const limelight=__labTwo.find(a=>a.isLimelight);
  const badge=()=>{const b=document.createElement('span');b.textContent='IN THE LIMELIGHT';b.style.cssText='display:inline-block;background:#bb3a2c;color:#fff;font:bold 11px system-ui;letter-spacing:1.2px;padding:7px 11px;border-radius:3px;text-transform:uppercase';return b};
  if(limelight){
   const art=document.querySelector('#heroCollage');
   if(art){
-   const feature=document.createElement('div');feature.style.cssText='position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px;width:min(215px,38vw);margin:22px auto 4px;text-align:center';
+   const feature=document.createElement('div');feature.className='sr-limelight-feature';feature.style.cssText='position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px;width:min(215px,38vw);margin:22px auto 4px;text-align:center';
    feature.append(badge());
    const coverLink=document.createElement('button');coverLink.type='button';coverLink.onclick=()=>select(10);coverLink.setAttribute('aria-label','Explore Limelight: Thelma Houston');coverLink.style.cssText='display:block;width:100%;padding:0;border:0;background:none;cursor:pointer;box-shadow:0 5px 20px #0003;border-radius:4px;overflow:hidden';
    const image=document.createElement('img');image.src=limelight.cover;image.alt=limelight.artist+' — '+limelight.title+' album cover';image.style.cssText='width:100%;height:auto;aspect-ratio:1;object-fit:cover;display:block';coverLink.append(image);feature.append(coverLink);
    const name=document.createElement('strong');name.textContent=limelight.artist+' — '+limelight.title;name.style.cssText='font-size:13px;line-height:1.4';feature.append(name);art.insertAdjacentElement('afterend',feature);
+   const responsive=document.createElement('style');
+   responsive.textContent='@media(min-width:801px){section:first-child>.split>.sr-limelight-feature{grid-column:2;grid-row:2;justify-self:center;align-self:start;margin-top:0!important;margin-bottom:10px!important}}@media(max-width:800px){section:first-child>.split>.sr-limelight-feature{grid-column:auto;grid-row:auto;justify-self:center;margin-top:22px!important}}';
+   document.head.append(responsive);
   }
   const cards=document.querySelectorAll('#shelf .card');
   if(cards[10]){const label=badge();label.style.marginBottom='9px';cards[10].prepend(label)}
