@@ -260,6 +260,30 @@ async function validateSavedPublication(url,db,listener){
  catch(e){return reply({valid:false,starts_on:date,saved_version:saved.version,issues:[e.message]})}
  return reply({valid:true,starts_on:date,saved_version:saved.version,saved_at:saved.updated_at,regular_albums:edition.albums.length,limelight:!!edition.limelight,total_records:edition.albums.length+(edition.limelight?1:0),issues:[],notice:"Validation only: nothing scheduled or published."});
 }
+async function dryRunChangeover(url,db,listener){
+ if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
+ const start=url.searchParams.get("starts_on");
+ if(editionNumberFromDate(start)===null||start<="2026-10-18")return error("Invalid future edition",400);
+ await publicationSchema(db);
+ const saved=await db.prepare("SELECT payload_json,version FROM studio_drafts WHERE starts_on=?").bind(start).first();
+ if(!saved)return error("No saved draft",404);
+ let edition;
+ try{edition=checkedForPublication(JSON.parse(saved.payload_json),start)}catch(e){return reply({pass:false,issues:[e.message],saved_version:saved.version})}
+ const scenarios=[
+  ["Saturday 23:59","2026-10-24T23:59:00+02:00",1],
+  ["Sunday 00:00","2026-10-25T00:00:00+02:00",2],
+  ["Sunday 02:30 CEST","2026-10-25T02:30:00+02:00",2],
+  ["Sunday 02:30 CET","2026-10-25T02:30:00+01:00",2],
+  ["Sunday 05:00","2026-10-25T05:00:00+01:00",2]
+ ];
+ const checks=scenarios.map(([label,instant,want])=>{
+  const local=berlinDate(new Date(instant));
+  const selected=local>=start?edition.edition_number:1;
+  return {label,instant,berlin_date:local,expected_edition:want,selected_edition:selected,pass:selected===want};
+ });
+ const ids=[...edition.albums,...(edition.limelight?[edition.limelight]:[])].map(r=>String(r.catalog_id));
+ return reply({pass:checks.every(c=>c.pass)&&new Set(ids).size===ids.length,saved_version:saved.version,edition_number:edition.edition_number,album_count:ids.length,checks,archive_after_changeover:{edition_1_available:true,edition_2_stays_current:true},journal_impact:"None: no journal or rating reads/writes performed",notice:"Read-only simulation using the saved cloud draft; does not schedule or publish."});
+}
 async function adminSchedule(request,url,db,listener){
  if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
  if(request.method!=="POST")return error("Method not allowed",405);
@@ -428,6 +452,7 @@ export default {
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
         else if(u.pathname==="/admin/library"&&["GET","POST","PUT"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
+        else if(u.pathname==="/admin/changeover-dry-run"&&request.method==="GET")res=await dryRunChangeover(u,env.DB,listener);
         else if(u.pathname==="/admin/validate-publication"&&request.method==="GET")res=await validateSavedPublication(u,env.DB,listener);
         else if(u.pathname==="/admin/schedule"&&request.method==="POST")res=await adminSchedule(request,u,env.DB,listener);
         else if(u.pathname==="/admin/generate-notes"&&request.method==="POST")res=await generateSleeveNotes(request,env,listener);
