@@ -48,6 +48,17 @@ shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
 __labTwo.forEach(r=>albumHistory.set(r.id,r));
 }else{activeEdition=1;browsingEdition=1;albums=editionOneAlbums.slice();currentEditionAlbums=albums.slice();}
 redrawEdition();wireEditionNavigation();renderArchiveShelf();renderJournal();
+/* Apply editorial copy to actual live DOM in the isolated iframe, independent of source-text replacement. */
+const __clubHeadline=document.querySelector('section:first-child h1');
+const __weekSubtitle=document.querySelectorAll('main > section')[1]?.querySelector('.lead');
+const __clubIntro=document.querySelector('section:first-child .grid p');
+const __collage=document.getElementById('heroCollage');
+if(__clubHeadline)__clubHeadline.innerHTML='Records for the week ahead.<br><em>Find the one that stays with you.</em>';
+if(__weekSubtitle)__weekSubtitle.textContent='A selection across genres and moods.';
+if(__clubIntro)__clubIntro.textContent='Different starting points. Listen to one, several, or revisit something you already love.';
+if(__collage)__collage.setAttribute('aria-label','Preview of the regular albums in this week’s selection');
+const __copyOK=!!__clubHeadline&&!!__weekSubtitle&&__clubHeadline.textContent.includes('Records for the week ahead.')&&__weekSubtitle.textContent==='A selection across genres and moods.';
+
 /* Standard editions remain ten covers; only a flagged eleventh record gets Limelight. Keep the desktop feature immediately beneath the collage, retain mobile layout. */
 if(${isE2}){
  const limelight=__labTwo.find(a=>a.isLimelight);
@@ -84,7 +95,7 @@ __labTag.setAttribute('role','status');
 __labTag.style.cssText='position:sticky;top:0;z-index:9999;background:#fce8cc;color:#242827;padding:12px 18px;font:700 16px system-ui;border-bottom:3px solid #d85b37';
 __labTag.textContent=(__labVisible?'✓ ':'✗ ')+'SIMULATION — EDITION '+activeEdition+' · '+__labCards.length+' visible records · '+__labArtReal+'/11 album covers from catalogue · '+(__labVisible?'Test data rendered':'RENDERING FAILED');
 document.body.prepend(__labTag);
-parent.postMessage({kind:'sr-lab',ok:true,active:activeEdition,shown:browsingEdition,count:albums.length,first:albums[0]?.title,domVerified:__labVisible,renderedCards:__labCards.length,renderedFirst:__labCards[0],artworkResolved:__labArtReal},'*');
+parent.postMessage({kind:'sr-lab',ok:true,active:activeEdition,shown:browsingEdition,count:albums.length,first:albums[0]?.title,domVerified:__labVisible,copyVerified:__copyOK,renderedCards:__labCards.length,renderedFirst:__labCards[0],artworkResolved:__labArtReal},'*');
 `;
 html=html.replace('loadPublishedEdition();',stage+'\n// live loader deliberately disabled in integration lab');
 const guard=`<base href="https://harry-lsc.github.io/sunday-rotation/"><script>
@@ -98,6 +109,6 @@ html=html.replace('<script>let albums=',guard+'<style>#memberGate{display:none!i
 document.getElementById('site').srcdoc=html;status.textContent='Checking actual rendered edition…';
 }catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
 }
-window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10)&&event.data.domVerified&&event.data.renderedCards===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · '+event.data.artworkResolved+'/11 covers loaded · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
+window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10)&&event.data.domVerified&&event.data.copyVerified&&event.data.renderedCards===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · '+event.data.artworkResolved+'/11 covers loaded · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
 document.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
 </script></html>
