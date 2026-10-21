@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Sunday Rotation · Isolated integration lab</title>
+<style>body{font:15px system-ui;background:#f2eee5;color:#242827;margin:0}.bar{padding:16px 22px;background:#fff;border-bottom:1px solid #ccc;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button{padding:10px;border:1px solid #777;background:#fff;cursor:pointer}button:focus{outline:2px solid #d85b37}#site{display:block;width:100%;height:calc(100vh - 156px);border:0}.note{padding:8px 22px;font-size:12px}select{padding:10px}</style>
+<div class="bar"><strong>Sunday Rotation · Integration lab</strong><label>Simulated Berlin time <select id="at"><option value="one">Sat 24 Oct · 23:59</option><option value="two">Sun 25 Oct · 00:00</option><option value="summer">Sun 25 Oct · 02:30 CEST</option><option value="winter">Sun 25 Oct · 02:30 CET</option><option value="later">Sun 25 Oct · 05:00</option></select></label><button id="reload">Apply scenario</button><span id="status">Loading original site…</span></div>
+<div class="note">TEST ONLY · Original production frontend appearance · synthetic edition and member data · all API writes blocked · no production publication. Edition 2 editorial text here is NOT the authoritative Cloudflare v31 draft. Covers may be placeholders.</div><iframe title="Sunday Rotation isolated frontend" id="site" sandbox="allow-scripts allow-forms"></iframe>
+<script>
+const sample=[['Kimbra','Vows (Deluxe Version)',2011,'518500009'],['Kacey Musgraves','Golden Hour',2018,'1440918116'],['Sons of Town Hall','The Adventures of the Sons of Town Hall',2019,'1696844519'],['The Gaslight Anthem',"The \'59 Sound",2008,'1880812196'],['Billie Holiday','Lady Sings the Blues',1956,'1469582218'],['Little Dragon','Ritual Union',2011,'444929109'],['Neutral Milk Hotel','In the Aeroplane Over the Sea',1998,'1839077554'],['Wenzel','Stirb mit mir ein Stück - Liebeslieder',1986,'1632902709'],['The Dave Brubeck Quartet','Time Out',1959,'292800458'],['Judas Priest','Painkiller (Bonus Track Version)',1990,'207178142'],['Thelma Houston','Any Way You Like It',1976,'1439279410']];
+const scenarios={one:false,two:true,summer:true,winter:true,later:true};
+async function load(){
+const status=document.getElementById('status');status.textContent='Preparing isolated view…';
+try{
+const res=await fetch('../index.html?integration='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('Site source HTTP '+res.status);
+let html=await res.text();
+if(!html.includes('const ENABLE_EDITION_LOADER=false;')||!html.includes('loadPublishedEdition();'))throw Error('Production adapter changed: stopping rather than guessing.');
+const isE2=scenarios[document.getElementById('at').value];
+const stage=`
+/* Isolated synthetic test: do not connect to production as a member. */
+const __labData=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(sample))}"));
+const __labTwo=__labData.map((r,i)=>({id:r[3],artist:r[0],title:r[1],genre:['Pop','Country','Folk','Rock','Jazz','Electronic','Indie','Folk','Jazz','Metal','Disco'][i],year:r[2],minutes:null,hook:'Synthetic integration fixture',desc:'Synthetic testing content, not the authoritative v31 draft.',mood:'A moment for discovery',sound:'Listen closely',why:'Selected for the integration test',cover:editionOneAlbums[i%editionOneAlbums.length].cover,tracks:[],isLimelight:i===10}));
+account={display_name:'Test Listener',listener_id:'0000000000'};token='synthetic-offline-only';showAccount();
+shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
+for(const r of editionOneAlbums)albumHistory.set(r.id,r);
+if(${isE2}){
+activeEdition=2;browsingEdition=2;currentEditionAlbums=__labTwo;albums=__labTwo;
+shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
+__labTwo.forEach(r=>albumHistory.set(r.id,r));
+}else{activeEdition=1;browsingEdition=1;albums=editionOneAlbums.slice();currentEditionAlbums=albums.slice();}
+redrawEdition();wireEditionNavigation();renderArchiveShelf();renderJournal();
+`;
+html=html.replace('loadPublishedEdition();',stage+'\n// live loader deliberately disabled in integration lab');
+const guard=`<base href="https://harry-lsc.github.io/sunday-rotation/"><script>
+const testLocalStorage=(()=>{const data={};return{getItem(k){return data[k]??null},setItem(k,v){data[k]=String(v)},removeItem(k){delete data[k]},clear(){for(const k in data)delete data[k]}}})();
+const __nativeFetch=window.fetch.bind(window);
+window.fetch=(url,opts={})=>{const method=(opts.method||'GET').toUpperCase();if(method!=='GET')return Promise.reject(Error('Integration lab blocks all server writes'));const target=String(url);if(target.includes('workers.dev'))return Promise.resolve(new Response(JSON.stringify({editions:[],legacy_edition_1:{available:true},found:false}),{status:200,headers:{'Content-Type':'application/json'}}));return __nativeFetch(url,opts)};
+window.XMLHttpRequest=function(){throw Error('XHR disabled in isolated lab')};
+<\/script>`;
+html=html.replace('<script>let albums=',guard+'<script>let albums=').replaceAll('localStorage.', 'testLocalStorage.');
+document.getElementById('site').srcdoc=html;status.textContent='Scenario ready · '+(isE2?'Edition 2':'Edition 1')+' · no writes';
+}catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
+}
+document.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
+</script></html>
