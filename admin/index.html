@@ -30,7 +30,7 @@
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="validatePublication">Validate saved edition</button><button type="button" id="dryRunChangeover">Test Sunday changeover</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div><div id="publicationValidationResults" role="status" aria-live="polite"></div><div id="changeoverResults" role="status" aria-live="polite" style="white-space:pre-line"></div>
+<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="validatePublication">Validate saved edition</button><button type="button" id="dryRunChangeover">Test Sunday changeover</button><button type="button" id="schedule" title="Requires a saved validated Cloudflare draft">Approve & schedule edition</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div><div id="publicationValidationResults" role="status" aria-live="polite"></div><div id="changeoverResults" role="status" aria-live="polite" style="white-space:pre-line"></div>
 <style>
 /* Final Sunday preview: only visible inside authenticated Admin Studio. */
 #previewPanel .sr-final-hero{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;background:#f2eee5;padding:20px;margin:20px 0;border:1px solid #cdc9bf}
@@ -353,6 +353,7 @@ function validSunday(){const d=new Date($("start").value+"T12:00:00Z");return !N
 function updateDates(){const number=editionNumber();$("edition").textContent=number===null?"—":String(number).padStart(2,"0");const d=new Date($("start").value+"T12:00:00Z");const end=new Date(+d+6*86400000);$("dateRange").textContent=validSunday()?("Scheduled week: "+$("start").value+" to "+end.toISOString().slice(0,10)):"Choose a Sunday as the start date."}
 let draftVersion=0,loadCounter=0;
 async function load(){
+  $("schedule").textContent="Approve & schedule edition";$("schedule").disabled=false;
   const token=++loadCounter,date=$("start").value;
   if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
   $("status").textContent="Loading cloud draft…";
@@ -400,6 +401,37 @@ document.addEventListener("input",e=>{const el=e.target;if(el.matches("[data-yea
 $("cards").addEventListener("input",()=>{collect();updateGenreLights()});$("lightFields").addEventListener("input",collect);
 $("addLight").onchange=()=>{collect();draw()};
 $("start").onchange=load;
+/* Scheduling uses the saved Cloudflare draft, not a local JSON file. The version is
+   checked again by the Worker. Publishing remains date-based and never happens on Save. */
+$("schedule").onclick=async()=>{
+ const btn=$("schedule"),status=$("status"),date=$("start").value;
+ if(editionNumber()===null||date==="2026-10-18"){status.textContent="Choose a future edition Sunday.";return}
+ btn.disabled=true;
+ try{
+  collect();
+  const stored=await adminApi("/admin/draft?starts_on="+encodeURIComponent(date));
+  if(date!==$("start").value)throw Error("Edition changed during the check.");
+  if(!stored.found)throw Error("Save your edition to Cloudflare first.");
+  if(stored.version!==draftVersion)throw Error("Draft version changed on another device. Reload the edition.");
+  const local=getData();
+  const fields=["artist","album","genre","mood","hook","cover_url","source_url","metadata_source","listen_when","listen_for","why_here","description","catalog_id","year","minutes","track_count","year_override"];
+  const sameRecord=(x,y)=>fields.every(k=>String(x?.[k]??"").trim()===String(y?.[k]??"").trim());
+  const unchanged=local.starts_on===stored.draft.starts_on&&local.edition_number===stored.draft.edition_number
+   &&local.albums.length===stored.draft.albums.length&&local.albums.every((r,i)=>sameRecord(r,stored.draft.albums[i]))
+   &&(!local.limelight&&!stored.draft.limelight||!!local.limelight&&!!stored.draft.limelight&&sameRecord(local.limelight,stored.draft.limelight));
+  if(!unchanged)throw Error("Unsaved changes found. Save your draft before scheduling.");
+  const check=await adminApi("/admin/validate-publication?starts_on="+encodeURIComponent(date));
+  if(!check.valid||check.saved_version!==draftVersion)throw Error("Validation failed: "+(check.issues||["Version mismatch"]).join(" · "));
+  const number=check.regular_albums+(check.limelight?1:0);
+  if(!confirm("Approve Edition "+editionNumber()+" for "+date+"?\\n\\n"+number+" records will publish automatically at 00:00 Europe/Berlin on that Sunday. This freezes saved Cloudflare draft version "+draftVersion+".\\n\\nNothing publishes today."))return;
+  status.textContent="Scheduling approved Cloudflare edition…";
+  const result=await adminApi("/admin/schedule","POST",{starts_on:date,expected_version:draftVersion});
+  if(!result.scheduled)throw Error("Worker did not confirm scheduling.");
+  status.textContent="SCHEDULED · Edition "+result.edition_number+" · "+date+" · draft version "+result.version+". It will automatically appear on Sunday at 00:00 Berlin time.";
+  btn.textContent="Edition scheduled";btn.disabled=true;
+ }catch(e){status.textContent="Not scheduled: "+e.message}
+ finally{if(btn.textContent!=="Edition scheduled")btn.disabled=false}
+};
 $("save").onclick=async()=>{
   if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
   const button=$("save");button.disabled=true;$("status").textContent="Saving to Cloudflare…";
