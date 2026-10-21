@@ -402,6 +402,29 @@ async function loadArchiveShelf(){
   renderJournal();
  }catch(err){console.warn("Cannot load The Shelf archive",err)}
 }
+function openArchiveNotes(item){
+ const container=document.getElementById("archiveRecords");
+ if(!container)return;
+ container.replaceChildren();
+ const back=document.createElement("button");
+ back.type="button";back.textContent="← Back to The Shelf";back.onclick=renderArchiveShelf;
+ container.append(back);
+ const info=document.createElement("p");info.className="muted";info.textContent="From Edition "+String(item.n).padStart(2,"0")+" · "+item.date;container.append(info);
+ const article=document.createElement("article");article.className="archive-record";
+ const img=document.createElement("img");img.src=item.a.cover;img.alt=item.a.title+" cover";
+ const notes=document.createElement("div");
+ const title=document.createElement("h2");title.textContent=item.a.artist+" — "+item.a.title;notes.append(title);
+ const meta=document.createElement("p");meta.textContent=[item.a.genre,item.a.year,item.a.minutes?item.a.minutes+" min":""].filter(Boolean).join(" · ");notes.append(meta);
+ for(const [label,value] of [["",item.a.desc],["Listen when",item.a.mood],["Listen for",item.a.sound],["Why it's here",item.a.why]]){
+  if(!value)continue;
+  if(label){const h=document.createElement("h3");h.textContent=label;notes.append(h)}
+  const p=document.createElement("p");
+  if(label==="Why it's here"){p.innerHTML=escapeHTML(value).replace(/\\*([^*\\n]+)\\*/g,"<em>$1</em>")}
+  else p.textContent=value;
+  notes.append(p);
+ }
+ article.append(img,notes);container.append(article);
+}
 function renderArchiveShelf(){
  const gateBox=document.getElementById("archiveGate"),body=document.getElementById("archiveBody");
  if(!gateBox||!body)return;
@@ -424,7 +447,7 @@ function renderArchiveShelf(){
   const artist=document.createElement("p");artist.textContent=item.a.artist;
   const meta=document.createElement("small");meta.textContent=[item.a.genre,item.a.year,item.a.minutes?item.a.minutes+" min":"", "Edition "+item.n].filter(Boolean).join(" · ");
   const hook=document.createElement("p");hook.textContent=item.a.hook;
-  const open=document.createElement("button");open.textContent="Explore record ↗";open.onclick=()=>{browseEdition(item.n);const i=albums.findIndex(a=>a.id===item.a.id);if(i>=0)select(i)};
+  const open=document.createElement("button");open.textContent="Explore record ↗";open.onclick=()=>openArchiveNotes(item);
   details.append(title,artist,meta,hook,open);card.append(pic,details);container.append(card);
  }
 }
