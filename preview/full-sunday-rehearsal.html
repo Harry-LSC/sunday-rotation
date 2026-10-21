@@ -1,0 +1,149 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Sunday Rotation · Full Sunday rehearsal</title>
+<style>body{font:15px system-ui;background:#f2eee5;color:#242827;margin:0}.bar{padding:16px 22px;background:#fff;border-bottom:1px solid #ccc;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button{padding:10px;border:1px solid #777;background:#fff;cursor:pointer}button:focus{outline:2px solid #d85b37}#site{display:block;width:100%;height:calc(100vh - 156px);border:0}.note{padding:12px 22px;font-size:14px;background:#fff0e8;border-bottom:2px solid #d85b37;line-height:1.5}.note a{color:#8e321e;font-weight:700}select{padding:10px}</style>
+<div class="bar"><strong>Sunday Rotation · Full Sunday rehearsal (separate from live site)</strong><label>Simulated Berlin time <select id="at"><option value="one">Sat 24 Oct · 23:59</option><option value="two">Sun 25 Oct · 00:00</option><option value="summer">Sun 25 Oct · 02:30 CEST</option><option value="winter">Sun 25 Oct · 02:30 CET</option><option value="later">Sun 25 Oct · 05:00</option></select></label><button id="reload">Apply scenario</button><label>Approved edition JSON <input id="draftFile" type="file" accept=".json,application/json"></label><button id="clearDraft" type="button">Use synthetic fixture</button><span id="status">Loading original site…</span></div>
+<div class="note"><strong>TEST MODE — real login and recovery keys do not work here.</strong> You are automatically signed in as a <strong>Test Listener</strong> using fake data. Please do not enter your real credentials. To sign in with your existing account, use the <a href="https://harry-lsc.github.io/sunday-rotation/" target="_blank" rel="noopener noreferrer">real Sunday Rotation site ↗</a> instead. The approved Cloudflare editorial text is already verified separately in Admin Studio. You do not need to import any JSON for this layout and archive rehearsal. The file remains in your browser. This rehearsal also checks a synthetic historic journal score and Edition 1 in The Shelf. The simulated date applies ONLY to the page below, not to the live website or another browser tab. This isolated test never publishes records or writes to the database. Without an imported backup, Edition 2 text is synthetic. Import the approved JSON to display the actual saved editorial copy. This preview does not send the imported file to a server.</div><iframe title="Sunday Rotation isolated frontend" id="site" sandbox="allow-scripts allow-forms"></iframe>
+<script>
+const sample=[['Kimbra','Vows (Deluxe Version)',2011,'518500009'],['Kacey Musgraves','Golden Hour',2018,'1440918116'],['Sons of Town Hall','The Adventures of the Sons of Town Hall',2019,'1696844519'],['The Gaslight Anthem',"The \'59 Sound",2008,'1880812196'],['Billie Holiday','Lady Sings the Blues',1956,'1469582218'],['Little Dragon','Ritual Union',2011,'444929109'],['Neutral Milk Hotel','In the Aeroplane Over the Sea',1998,'1839077554'],['Wenzel','Stirb mit mir ein Stück - Liebeslieder',1986,'1632902709'],['The Dave Brubeck Quartet','Time Out',1959,'292800458'],['Judas Priest','Painkiller (Bonus Track Version)',1990,'207178142'],['Thelma Houston','Any Way You Like It',1976,'1439279410']];
+const scenarios={one:false,two:true,summer:true,winter:true,later:true};
+let cloudExport=null;
+const dateWanted='2026-10-25';
+const safeRecord=(r,i)=>({
+ id:String(r.catalog_id||r.id||''),
+ artist:String(r.artist||''),title:String(r.album||r.title||''),genre:String(r.genre||'Music'),year:Number(r.year)||null,minutes:Number(r.minutes)||null,
+ hook:String(r.hook||''),desc:String(r.description||r.desc||''),mood:String(r.listen_when||''),sound:String(r.listen_for||''),why:String(r.why_here||''),
+ cover:String(r.cover_url||r.cover||''),tracks:[],isLimelight:i===10
+});
+function validateExport(d){
+ if(d?.format!=='sunday-rotation-edition-preview-v1'||d.starts_on!==dateWanted||d.edition_number!==2||!Array.isArray(d.albums)||d.albums.length!==10)throw Error('Expected Edition 2 backup for 2026-10-25 containing 10 regular albums');
+ const records=[...d.albums,...(d.limelight?[d.limelight]:[])].map(safeRecord);
+ if(records.some(r=>!/^[0-9]{5,20}$/.test(r.id)||!r.artist||!r.title||!r.cover))throw Error('An album is missing catalogue ID, artist, title or cover');
+ if(new Set(records.map(r=>r.id)).size!==records.length)throw Error('Duplicate catalogue IDs');
+ return records;
+}
+
+function artworkFallback(r,i){
+ const shades=['#52263a','#c1a36a','#183b45','#851f27','#342b51','#d6a85a','#8c643b','#395f44','#345b83','#662b2b','#9e4d54'];
+ const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="'+shades[i]+'"/><text x="50%" y="44%" fill="#fff" text-anchor="middle" font-family="Arial" font-size="26">'+esc(r[0])+'</text><text x="50%" y="55%" fill="#fff" text-anchor="middle" font-family="Arial" font-size="25">'+esc(r[1].slice(0,35))+'</text><text x="50%" y="92%" fill="#fff" opacity=".7" text-anchor="middle" font-family="Arial" font-size="15">ARTWORK UNAVAILABLE · TEST PLACEHOLDER</text></svg>';
+ return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+async function resolveArtwork(r,i){
+ try{
+  const res=await fetch('https://itunes.apple.com/lookup?id='+encodeURIComponent(r[3])+'&entity=album',{cache:'force-cache'});
+  if(!res.ok)throw Error('catalogue unavailable');
+  const json=await res.json();
+  const album=(json.results||[]).find(item=>String(item.collectionId)===String(r[3])&&item.artworkUrl100);
+  if(!album)throw Error('catalogue ID not found');
+  return [...r,album.artworkUrl100.replace(/100x100bb/g,'600x600bb'),true];
+ }catch(e){return [...r,artworkFallback(r,i),false]}
+}
+async function load(){
+const status=document.getElementById('status');status.textContent='Preparing isolated view…';document.getElementById('site').style.visibility='hidden';
+try{
+const res=await fetch('https://raw.githubusercontent.com/Harry-LSC/sunday-rotation/sunday-edition-integration-20261021/index.html?integration='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('Site source HTTP '+res.status);
+let html=await res.text();
+/* Timeless editorial copy: 10 regular albums, optionally one Limelight. */
+html=html.replace('Ten records for the week ahead.','Records for the week ahead.')
+ .replace('10 albums across all genres and moods','A selection across genres and moods')
+ .replace('Ten different starting points.','Different starting points.')
+ .replace('Preview of all ten albums in this week’s selection','Preview of the regular albums in this week’s selection');
+
+if(!html.includes('const ENABLE_EDITION_LOADER=true;')||!html.includes('loadPublishedEdition();'))throw Error('Production adapter changed: stopping rather than guessing.');
+const isE2=scenarios[document.getElementById('at').value];
+const fixtures=cloudExport?null:await Promise.all(sample.map(resolveArtwork));
+const prepared=cloudExport||fixtures.map((r,i)=>({id:r[3],artist:r[0],title:r[1],genre:['Pop','Country','Folk','Rock','Jazz','Electronic','Indie','Folk','Jazz','Metal','Disco'][i],year:r[2],minutes:null,hook:'Synthetic integration fixture',desc:'Synthetic testing content, not the authoritative v31 draft.',mood:'A moment for discovery',sound:'Listen closely',why:'Selected for the integration test',cover:r[4],tracks:[],isLimelight:i===10}));
+
+const stage=`
+/* Isolated synthetic test: do not connect to production as a member. */
+const __labData=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(prepared))}"));
+const __labTwo=__labData;
+account={display_name:'Test Listener',listener_id:'0000000000'};token='synthetic-offline-only';showAccount();gate(false);
+if(${isE2})shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
+for(const r of editionOneAlbums)albumHistory.set(r.id,r);
+if(${isE2}){
+activeEdition=2;browsingEdition=2;currentEditionAlbums=__labTwo;albums=__labTwo;
+shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
+__labTwo.forEach(r=>albumHistory.set(r.id,r));
+}else{activeEdition=1;browsingEdition=1;albums=editionOneAlbums.slice();currentEditionAlbums=albums.slice();}
+redrawEdition();wireEditionNavigation();renderArchiveShelf();renderJournal();
+/* Apply editorial copy to actual live DOM in the isolated iframe, independent of source-text replacement. */
+const __clubHeadline=document.querySelector('section:first-child h1');
+const __weekSubtitle=document.querySelectorAll('main > section')[1]?.querySelector('.lead');
+const __clubIntro=document.querySelector('section:first-child .grid p');
+const __collage=document.getElementById('heroCollage');
+if(__clubHeadline)__clubHeadline.innerHTML='Records for the week ahead.<br><em>Find the one that stays with you.</em>';
+if(__weekSubtitle)__weekSubtitle.textContent='A selection across genres and moods.';
+if(__clubIntro)__clubIntro.textContent='Different starting points. Listen to one, several, or revisit something you already love.';
+if(__collage)__collage.setAttribute('aria-label','Preview of the regular albums in this week’s selection');
+const __copyOK=!!__clubHeadline&&!!__weekSubtitle&&__clubHeadline.textContent.includes('Records for the week ahead.')&&__weekSubtitle.textContent==='A selection across genres and moods.';
+
+/* Standard editions remain ten covers; only a flagged eleventh record gets Limelight. Keep the desktop feature immediately beneath the collage, retain mobile layout. */
+if(${isE2}){
+ const limelight=__labTwo.find(a=>a.isLimelight);
+ const badge=()=>{const b=document.createElement('span');b.textContent='IN THE LIMELIGHT';b.style.cssText='display:inline-block;background:#bb3a2c;color:#fff;font:bold 11px system-ui;letter-spacing:1.2px;padding:7px 11px;border-radius:3px;text-transform:uppercase';return b};
+ if(limelight){
+  const art=document.querySelector('#heroCollage');
+  if(art){
+   const feature=document.createElement('div');feature.className='sr-limelight-feature';feature.style.cssText='position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px;width:min(215px,38vw);margin:22px auto 4px;text-align:center';
+   feature.append(badge());
+   const coverLink=document.createElement('button');coverLink.type='button';coverLink.onclick=()=>select(10);coverLink.setAttribute('aria-label','Explore Limelight: Thelma Houston');coverLink.style.cssText='display:block;width:100%;padding:0;border:0;background:none;cursor:pointer;box-shadow:0 5px 20px #0003;border-radius:4px;overflow:hidden';
+   const image=document.createElement('img');image.src=limelight.cover;image.alt=limelight.artist+' — '+limelight.title+' album cover';image.style.cssText='width:100%;height:auto;aspect-ratio:1;object-fit:cover;display:block';coverLink.append(image);feature.append(coverLink);
+   const name=document.createElement('strong');name.textContent=limelight.artist+' — '+limelight.title;name.style.cssText='font-size:13px;line-height:1.4';feature.append(name);art.insertAdjacentElement('afterend',feature);
+   const responsive=document.createElement('style');
+   responsive.textContent='@media(min-width:801px){section:first-child>.split>.sr-limelight-feature{grid-column:2;grid-row:2;justify-self:center;align-self:start;margin-top:0!important;margin-bottom:10px!important}}@media(max-width:800px){section:first-child>.split>.sr-limelight-feature{grid-column:auto;grid-row:auto;justify-self:center;margin-top:22px!important}}';
+   document.head.append(responsive);
+  }
+  const cards=document.querySelectorAll('#shelf .card');
+  if(cards[10]){const label=badge();label.style.marginBottom='9px';cards[10].prepend(label)}
+  const detail=document.querySelector('#detailCover');
+  if(detail){const label=badge();label.id='labLimelightDetail';label.style.display='none';detail.insertAdjacentElement('beforebegin',label)}
+  const oldSetAlbum=setAlbum;
+  setAlbum=function(i){oldSetAlbum(i);const label=document.getElementById('labLimelightDetail');if(label)label.style.display=Number(i)===10?'inline-block':'none'};
+  const oldRenderShelf=renderShelf;
+  renderShelf=function(){oldRenderShelf();const card=document.querySelectorAll('#shelf .card')[10];if(card){const label=badge();label.style.marginBottom='9px';card.prepend(label)}};
+ }
+}
+/* Seed one historic score to test journal continuity; never use a real listener or backend. */
+reviews[editionOneAlbums[0].id]=cleanReview({score:8.5,moods:['Reflective'],highlights:['Lyrics'],again:'Yes',favourite:'',note:'Test review survived Sunday'},editionOneAlbums[0].id);
+renderJournal();renderArchiveShelf();
+const __labJournal=document.querySelector('#journal')?.textContent||'';
+const __labShelf=document.getElementById('archiveRecords')?.textContent||'';
+const __labJournalOK=__labJournal.includes('Bryter Layter')||__labJournal.includes('albums rated across editions');
+const __labShelfOK=${isE2}?shelfEditions.has(1):!shelfEditions.has(1);
+const __labArtReal=__labData.filter(r=>!!r.cover).length;
+const __labExpected=${isE2}?(cloudExport?.[0]?.title||'Vows (Deluxe Version)'):'Bryter Layter';
+const __labCards=[...document.querySelectorAll('#shelf .card h3')].map(x=>x.textContent);
+const __labTab=[...document.querySelectorAll('#albumTabs .album-tab strong')].map(x=>x.textContent);
+const __labVisible=__labCards.includes(__labExpected)&&__labTab.includes(__labExpected)&&document.querySelector('.edition-current')?.textContent.includes('Edition '+String(activeEdition).padStart(2,'0'));
+const __labTag=document.createElement('div');
+__labTag.setAttribute('role','status');
+__labTag.style.cssText='position:sticky;top:0;z-index:9999;background:#fce8cc;color:#242827;padding:12px 18px;font:700 16px system-ui;border-bottom:3px solid #d85b37';
+__labTag.textContent=(__labVisible?'✓ ':'✗ ')+'SIMULATION — EDITION '+activeEdition+' · '+__labCards.length+' visible records · '+__labArtReal+'/11 album covers from catalogue · '+(__labVisible?'Test data rendered':'RENDERING FAILED');
+document.body.prepend(__labTag);
+parent.postMessage({kind:'sr-lab',ok:true,active:activeEdition,shown:browsingEdition,count:albums.length,first:albums[0]?.title,domVerified:__labVisible,copyVerified:__copyOK,journalVerified:__labJournalOK,shelfVerified:__labShelfOK,renderedCards:__labCards.length,renderedFirst:__labCards[0],artworkResolved:__labArtReal},'*');
+`;
+html=html.replace('loadPublishedEdition();',stage+'\n// live loader deliberately disabled in integration lab');
+const guard=`<base href="https://harry-lsc.github.io/sunday-rotation/"><script>
+window.addEventListener('error',e=>parent.postMessage({kind:'sr-lab',ok:false,error:e.message},'*'));window.addEventListener('unhandledrejection',e=>parent.postMessage({kind:'sr-lab',ok:false,error:String(e.reason)},'*'));
+const testLocalStorage=(()=>{const data={};return{getItem(k){return data[k]??null},setItem(k,v){data[k]=String(v)},removeItem(k){delete data[k]},clear(){for(const k in data)delete data[k]}}})();
+const __nativeFetch=window.fetch.bind(window);
+window.fetch=(url,opts={})=>{const method=(opts.method||'GET').toUpperCase();if(method!=='GET')return Promise.reject(Error('Integration lab blocks all server writes'));const target=String(url);if(target.includes('workers.dev'))return Promise.resolve(new Response(JSON.stringify({editions:[],legacy_edition_1:{available:true},found:false}),{status:200,headers:{'Content-Type':'application/json'}}));return __nativeFetch(url,opts)};
+window.XMLHttpRequest=function(){throw Error('XHR disabled in isolated lab')};
+<\/script>`;
+html=html.replace('<script>let albums=',guard+'<style>#memberGate{display:none!important}</style><script>let albums=').replaceAll('localStorage.', 'testLocalStorage.');
+document.getElementById('site').srcdoc=html;status.textContent='Checking actual rendered edition…';
+}catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
+}
+window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const expectedCount=selected===2?(cloudExport?.length||11):10;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===expectedCount&&event.data.domVerified&&event.data.copyVerified&&event.data.journalVerified&&event.data.shelfVerified&&event.data.renderedCards===expectedCount;s.textContent=(valid?'PASS':'FAIL')+(cloudExport?' · Imported JSON':' · Synthetic fixture')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · journal '+(event.data.journalVerified?'OK':'FAIL')+' · Shelf '+(event.data.shelfVerified?'OK':'FAIL')+' · '+event.data.artworkResolved+' artwork URLs · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
+document.getElementById('draftFile').onchange=async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  if(f.size>500000)throw Error('Backup too large');
+  cloudExport=validateExport(JSON.parse(await f.text()));
+  document.getElementById('status').textContent='Edition 2 JSON accepted locally · '+cloudExport.length+' albums. No upload performed.';
+  await load();
+ }catch(err){cloudExport=null;document.getElementById('status').textContent='Import rejected: '+err.message}
+};
+document.getElementById('clearDraft').onclick=()=>{cloudExport=null;document.getElementById('draftFile').value='';load()};
+document.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
+</script></html>
