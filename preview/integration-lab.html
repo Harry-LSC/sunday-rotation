@@ -16,7 +16,7 @@ const stage=`
 /* Isolated synthetic test: do not connect to production as a member. */
 const __labData=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(sample))}"));
 const __labTwo=__labData.map((r,i)=>({id:r[3],artist:r[0],title:r[1],genre:['Pop','Country','Folk','Rock','Jazz','Electronic','Indie','Folk','Jazz','Metal','Disco'][i],year:r[2],minutes:null,hook:'Synthetic integration fixture',desc:'Synthetic testing content, not the authoritative v31 draft.',mood:'A moment for discovery',sound:'Listen closely',why:'Selected for the integration test',cover:editionOneAlbums[i%editionOneAlbums.length].cover,tracks:[],isLimelight:i===10}));
-account={display_name:'Test Listener',listener_id:'0000000000'};token='synthetic-offline-only';showAccount();
+account={display_name:'Test Listener',listener_id:'0000000000'};token='synthetic-offline-only';showAccount();gate(false);
 shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
 for(const r of editionOneAlbums)albumHistory.set(r.id,r);
 if(${isE2}){
