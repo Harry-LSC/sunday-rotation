@@ -243,7 +243,11 @@ async function publicationArchive(db,listener){
  if(!listener)return error("Membership required",401);
  await publicationSchema(db);
  const today=berlinDate();
- const rows=await db.prepare("SELECT starts_on,edition_number,payload_json FROM scheduled_editions WHERE starts_on<? ORDER BY starts_on DESC LIMIT 100").bind(today).all();
+ // An edition stays current for its entire Sunday-Saturday week, not just Sunday.
+ // Archive only editions older than the currently effective edition's start date.
+ const current=await db.prepare("SELECT starts_on FROM scheduled_editions WHERE starts_on<=? ORDER BY starts_on DESC LIMIT 1").bind(today).first();
+ const archiveBefore=current?.starts_on||today;
+ const rows=await db.prepare("SELECT starts_on,edition_number,payload_json FROM scheduled_editions WHERE starts_on<? ORDER BY starts_on DESC LIMIT 100").bind(archiveBefore).all();
  const editions=(rows.results||[]).map(r=>({starts_on:r.starts_on,edition_number:r.edition_number,edition:JSON.parse(r.payload_json)}));
  // Edition 1 is bundled into the public site's initial catalogue and can be rendered without duplicating artwork in D1.
  return reply({editions,legacy_edition_1:{starts_on:"2026-10-18",ends_on:"2026-10-24",available:today>"2026-10-24"}});
