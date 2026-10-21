@@ -319,6 +319,7 @@ function validSunday(){const d=new Date($("start").value+"T12:00:00Z");return !N
 function updateDates(){const number=editionNumber();$("edition").textContent=number===null?"—":String(number).padStart(2,"0");const d=new Date($("start").value+"T12:00:00Z");const end=new Date(+d+6*86400000);$("dateRange").textContent=validSunday()?("Scheduled week: "+$("start").value+" to "+end.toISOString().slice(0,10)):"Choose a Sunday as the start date."}
 let draftVersion=0,loadCounter=0;
 async function load(){
+  $("schedule").textContent="Approve & schedule edition";$("schedule").disabled=false;
   const token=++loadCounter,date=$("start").value;
   if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
   $("status").textContent="Loading cloud draft…";
@@ -378,7 +379,13 @@ $("schedule").onclick=async()=>{
   if(date!==$("start").value)throw Error("Edition changed during the check.");
   if(!stored.found)throw Error("Save your edition to Cloudflare first.");
   if(stored.version!==draftVersion)throw Error("Draft version changed on another device. Reload the edition.");
-  if(JSON.stringify(getData())!==JSON.stringify(stored.draft))throw Error("Unsaved changes found. Save your draft before scheduling.");
+  const local=getData();
+  const fields=["artist","album","genre","mood","hook","cover_url","source_url","metadata_source","listen_when","listen_for","why_here","description","catalog_id","year","minutes","track_count","year_override"];
+  const sameRecord=(x,y)=>fields.every(k=>String(x?.[k]??"").trim()===String(y?.[k]??"").trim());
+  const unchanged=local.starts_on===stored.draft.starts_on&&local.edition_number===stored.draft.edition_number
+   &&local.albums.length===stored.draft.albums.length&&local.albums.every((r,i)=>sameRecord(r,stored.draft.albums[i]))
+   &&(!local.limelight&&!stored.draft.limelight||!!local.limelight&&!!stored.draft.limelight&&sameRecord(local.limelight,stored.draft.limelight));
+  if(!unchanged)throw Error("Unsaved changes found. Save your draft before scheduling.");
   const check=await adminApi("/admin/validate-publication?starts_on="+encodeURIComponent(date));
   if(!check.valid||check.saved_version!==draftVersion)throw Error("Validation failed: "+(check.issues||["Version mismatch"]).join(" · "));
   const number=check.regular_albums+(check.limelight?1:0);
