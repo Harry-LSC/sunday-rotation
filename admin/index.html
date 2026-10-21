@@ -539,11 +539,15 @@ function previewRecord(r,idx){
  const details=document.createElement("details");const summary=document.createElement("summary");summary.textContent="Read sleeve notes";details.append(summary);
  for(const [label,key] of [["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
   const heading=document.createElement("strong");heading.textContent=label;const p=document.createElement("p");
-  // Preserve actual prose and prevent HTML injection; asterisks remain source text.
+  // Text nodes preserve the exact Cloudflare content; only paired *markers* turn italic.
   const value=r[key]||"(Missing)";
-  if(key==="why_here"&&value.includes("*")){
-   const parts=value.split(/(\\*[^*\\n]+\\*)/g);
-   for(const part of parts){if(/^\\*[^*\\n]+\\*$/.test(part)){const em=document.createElement("em");em.textContent=part.slice(1,-1);p.append(em)}else p.append(document.createTextNode(part))}
+  if(key==="why_here"){
+   const parts=String(value).split("*");
+   for(let i=0;i<parts.length;i++){
+    const italic=i%2===1&&i<parts.length-1&&parts[i].length>0;
+    if(italic){const em=document.createElement("em");em.textContent=parts[i];p.append(em)}
+    else p.append(document.createTextNode((i%2===1?"*":"")+parts[i]));
+   }
   }else p.textContent=value;
   details.append(heading,p);
  }
