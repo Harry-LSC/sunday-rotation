@@ -6,7 +6,7 @@
 const sample=[['Kimbra','Vows (Deluxe Version)',2011,'518500009'],['Kacey Musgraves','Golden Hour',2018,'1440918116'],['Sons of Town Hall','The Adventures of the Sons of Town Hall',2019,'1696844519'],['The Gaslight Anthem',"The \'59 Sound",2008,'1880812196'],['Billie Holiday','Lady Sings the Blues',1956,'1469582218'],['Little Dragon','Ritual Union',2011,'444929109'],['Neutral Milk Hotel','In the Aeroplane Over the Sea',1998,'1839077554'],['Wenzel','Stirb mit mir ein Stück - Liebeslieder',1986,'1632902709'],['The Dave Brubeck Quartet','Time Out',1959,'292800458'],['Judas Priest','Painkiller (Bonus Track Version)',1990,'207178142'],['Thelma Houston','Any Way You Like It',1976,'1439279410']];
 const scenarios={one:false,two:true,summer:true,winter:true,later:true};
 async function load(){
-const status=document.getElementById('status');status.textContent='Preparing isolated view…';
+const status=document.getElementById('status');status.textContent='Preparing isolated view…';document.getElementById('site').style.visibility='hidden';
 try{
 const res=await fetch('../index.html?integration='+Date.now(),{cache:'no-store'});if(!res.ok)throw Error('Site source HTTP '+res.status);
 let html=await res.text();
@@ -25,17 +25,18 @@ shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
 __labTwo.forEach(r=>albumHistory.set(r.id,r));
 }else{activeEdition=1;browsingEdition=1;albums=editionOneAlbums.slice();currentEditionAlbums=albums.slice();}
 redrawEdition();wireEditionNavigation();renderArchiveShelf();renderJournal();
+parent.postMessage({kind:'sr-lab',ok:true,active:activeEdition,shown:browsingEdition,count:albums.length,first:albums[0]?.title},'*');
 `;
 html=html.replace('loadPublishedEdition();',stage+'\n// live loader deliberately disabled in integration lab');
 const guard=`<base href="https://harry-lsc.github.io/sunday-rotation/"><script>
-const testLocalStorage=(()=>{const data={};return{getItem(k){return data[k]??null},setItem(k,v){data[k]=String(v)},removeItem(k){delete data[k]},clear(){for(const k in data)delete data[k]}}})();
+window.addEventListener('error',e=>parent.postMessage({kind:'sr-lab',ok:false,error:e.message},'*'));window.addEventListener('unhandledrejection',e=>parent.postMessage({kind:'sr-lab',ok:false,error:String(e.reason)},'*'));\nconst testLocalStorage=(()=>{const data={};return{getItem(k){return data[k]??null},setItem(k,v){data[k]=String(v)},removeItem(k){delete data[k]},clear(){for(const k in data)delete data[k]}}})();
 const __nativeFetch=window.fetch.bind(window);
 window.fetch=(url,opts={})=>{const method=(opts.method||'GET').toUpperCase();if(method!=='GET')return Promise.reject(Error('Integration lab blocks all server writes'));const target=String(url);if(target.includes('workers.dev'))return Promise.resolve(new Response(JSON.stringify({editions:[],legacy_edition_1:{available:true},found:false}),{status:200,headers:{'Content-Type':'application/json'}}));return __nativeFetch(url,opts)};
 window.XMLHttpRequest=function(){throw Error('XHR disabled in isolated lab')};
 <\/script>`;
 html=html.replace('<script>let albums=',guard+'<style>#memberGate{display:none!important}</style><script>let albums=').replaceAll('localStorage.', 'testLocalStorage.');
-document.getElementById('site').srcdoc=html;status.textContent='Scenario ready · '+(isE2?'Edition 2':'Edition 1')+' · Test Listener (no real authentication)';
+document.getElementById('site').srcdoc=html;status.textContent='Checking actual rendered edition…';
 }catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
 }
-document.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
+window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.count+' albums · '+event.data.first;document.getElementById('site').style.visibility=valid?'visible':'hidden';});\ndocument.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
 </script></html>
