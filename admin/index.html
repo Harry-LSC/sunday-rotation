@@ -31,13 +31,47 @@
 <div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
 <div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="validatePublication">Validate saved edition</button><button type="button" id="dryRunChangeover">Test Sunday changeover</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div><div id="publicationValidationResults" role="status" aria-live="polite"></div><div id="changeoverResults" role="status" aria-live="polite" style="white-space:pre-line"></div>
+<style>
+/* Final Sunday preview: only visible inside authenticated Admin Studio. */
+#previewPanel .sr-final-hero{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;background:#f2eee5;padding:20px;margin:20px 0;border:1px solid #cdc9bf}
+#previewPanel .sr-final-copy h2{font:600 clamp(28px,3vw,47px)/1.05 Georgia,serif;letter-spacing:-1px;margin:18px 0}
+#previewPanel .sr-final-copy h2 em{color:#bc3926;font-weight:400}
+#previewPanel .sr-final-collage{position:relative;min-height:350px;height:min(38vw,430px)}
+#previewPanel .sr-final-cover{position:absolute;aspect-ratio:1;width:32%;padding:0;border:0;box-shadow:0 7px 20px #26313a26;overflow:hidden;background:none}
+#previewPanel .sr-final-cover img{width:100%;height:100%;object-fit:cover}
+#previewPanel .sr-final-cover:nth-child(1){top:4%;left:31%;transform:rotate(-9deg);z-index:5}
+#previewPanel .sr-final-cover:nth-child(2){top:7%;left:4%;transform:rotate(12deg);z-index:3}
+#previewPanel .sr-final-cover:nth-child(3){top:9%;right:4%;transform:rotate(-11deg);z-index:4}
+#previewPanel .sr-final-cover:nth-child(4){top:30%;left:16%;transform:rotate(-7deg);z-index:6}
+#previewPanel .sr-final-cover:nth-child(5){top:29%;right:15%;transform:rotate(8deg);z-index:7}
+#previewPanel .sr-final-cover:nth-child(6){top:51%;left:2%;transform:rotate(-9deg);z-index:4}
+#previewPanel .sr-final-cover:nth-child(7){top:51%;right:1%;transform:rotate(11deg);z-index:5}
+#previewPanel .sr-final-cover:nth-child(8){top:55%;left:33%;transform:rotate(-7deg);z-index:9}
+#previewPanel .sr-final-cover:nth-child(9){top:72%;left:15%;transform:rotate(12deg);z-index:8}
+#previewPanel .sr-final-cover:nth-child(10){top:72%;right:15%;transform:rotate(-12deg);z-index:10}
+#previewPanel .sr-final-limelight{grid-column:2;justify-self:center;display:flex;flex-direction:column;align-items:center;text-align:center;width:min(210px,45vw);gap:8px;margin:0 0 16px}
+#previewPanel .sr-final-limelight img{display:block;width:100%;aspect-ratio:1;object-fit:cover;box-shadow:0 7px 20px #26313a26}
+#previewPanel .sr-final-badge{background:#bc3926;color:#fff;padding:7px 12px;letter-spacing:1.2px;font:700 11px system-ui}
+#previewPanel .sr-final-limelight strong{font-size:13px;line-height:1.4}
+#previewPanel .sr-final-card{background:#fffdfa;border:1px solid #cdc9bf;padding:12px;min-width:0}
+#previewPanel .sr-final-card img{width:100%;aspect-ratio:1;object-fit:cover}
+#previewPanel .sr-final-card h3{font:600 20px Georgia,serif;margin:8px 0}
+#previewPanel .sr-final-card details{margin-top:10px}
+#previewPanel .sr-final-card p{font-size:13px;overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:800px){
+ #previewPanel .sr-final-hero{grid-template-columns:minmax(0,1fr);padding:12px}
+ #previewPanel .sr-final-collage{height:370px;min-height:0;width:min(100%,450px);margin:auto}
+ #previewPanel .sr-final-limelight{grid-column:1;justify-self:center;margin-top:12px}
+}
+@media(max-width:420px){#previewPanel .sr-final-collage{height:290px}}
+</style>
 <section class="card" id="previewPanel" hidden style="margin-top:18px">
  <div class="cardtop"><div><div class="eyebrow">SAFE DRY RUN · NO PUBLICATION</div><h2 id="previewHeading">Sunday preview</h2></div><button type="button" id="closePreview">Close</button></div>
- <p class="muted" id="previewMessage"></p>
+ <p class="muted" id="previewMessage"></p><p class="muted" id="srSavedDraftPreviewStatus" role="status"></p>
  <div class="toolbar">
   <label>Simulated time (Europe/Berlin)<select id="previewTime"><option value="before">Saturday 24 Oct · 23:59</option><option value="after" selected>Sunday 25 Oct · 00:00</option><option value="morning">Sunday 25 Oct · 09:00</option></select></label>
  </div>
- <div id="previewChecks"></div>
+ <div id="previewChecks"></div><div id="srFinalHero"></div>
  <div id="previewCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px"></div>
  <p class="muted">Preview only. Does not change the public website, database, scheduled editions, ratings or listener journals.</p>
 </section>
@@ -493,43 +527,68 @@ function validatePreview(d){
  if(d.limelight&&(!d.limelight.artist?.trim()||!d.limelight.album?.trim()||!d.limelight.cover_url))issues.push("Limelight is incomplete.");
  return issues;
 }
-function renderSundayPreview(){
- const d=getData(),time=$("previewTime").value;
- const ready=validatePreview(d);
- const before=time==="before";
- $("previewHeading").textContent=(before?"Edition 1 (still live)":"Edition "+d.edition_number+" — "+d.starts_on);
- $("previewMessage").textContent=before?
-  "At 23:59 the previous edition should still be visible. Its original albums and journal must remain unchanged.":
-  "Simulated "+(time==="morning"?"Sunday morning":"Sunday midnight")+" display. This shows the current unsaved form values and is NOT the public website.";
- $("previewChecks").replaceChildren();
- const checks=[
-  ["Edition complete",ready.length===0,ready.length?ready.join(" · "):"Ten albums, cover art and all four sleeve-note fields present."],
-  ["Time boundary",true,before?"Previous edition remains current.":"New edition becomes current only when valid and scheduled."],
-  ["Archive expectation",true,before?"Edition 1 remains current.":"Edition 1 should remain available in the archive."],
-  ["Actual publication",false,"Not implemented or enabled; journal, rating and score migration still required."]
- ];
- for(const [name,ok,detail] of checks){
-   const p=document.createElement("p");p.style.margin="9px 0";
-   const strong=document.createElement("strong");strong.textContent=(ok?"✓ ":"⚠ ")+name+": ";
-   p.append(strong,document.createTextNode(detail));$("previewChecks").append(p);
+let savedSundayPreview=null;
+function previewRecord(r,idx){
+ const card=document.createElement("article");card.className="sr-final-card";
+ if(r===savedSundayPreview?.limelight){const b=document.createElement("span");b.className="sr-final-badge";b.textContent="IN THE LIMELIGHT";card.append(b)}
+ const img=document.createElement("img");img.src=r.cover_url||"";img.alt=(r.album||"Album")+" — "+(r.artist||"Artist");img.loading="lazy";card.append(img);
+ const title=document.createElement("h3");title.textContent=r.album||"(Missing album)";
+ const artist=document.createElement("p");artist.textContent=r.artist||"(Missing artist)";
+ const meta=document.createElement("small");meta.textContent=[r.genre,r.year,r.minutes?r.minutes+" min":""].filter(Boolean).join(" · ");
+ const hook=document.createElement("p");hook.textContent=r.hook||"";card.append(title,artist,meta,hook);
+ const details=document.createElement("details");const summary=document.createElement("summary");summary.textContent="Read sleeve notes";details.append(summary);
+ for(const [label,key] of [["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
+  const heading=document.createElement("strong");heading.textContent=label;const p=document.createElement("p");
+  // Preserve actual prose and prevent HTML injection; asterisks remain source text.
+  p.textContent=r[key]||"(Missing)";
+  details.append(heading,p);
  }
- const cards=$("previewCards");cards.replaceChildren();
- if(before){const p=document.createElement("p");p.textContent="Edition 1 is the current public catalogue before midnight. Select a Sunday time to preview the new shelf.";cards.append(p);return}
- for(const r of [...d.albums,...(d.limelight?[d.limelight]:[])]){
-  const card=document.createElement("div");card.style.cssText="background:#fffdfa;border:1px solid #cdc9bf;padding:12px;min-width:0";
-  if(r.cover_url){const img=document.createElement("img");img.src=r.cover_url;img.alt="";img.loading="lazy";img.style.cssText="width:100%;aspect-ratio:1;object-fit:cover";img.onerror=()=>{img.style.opacity=".2";img.title="Artwork failed to load"};card.append(img)}
-  const h=document.createElement("h3");h.style.cssText="font:600 20px Georgia,serif;margin:8px 0";h.textContent=r.album||"(Missing album)";
-  const a=document.createElement("p");a.style.cssText="font-size:13px;margin:4px 0";a.textContent=r.artist||"(Missing artist)";
-  const m=document.createElement("p");m.className="muted";m.textContent=[r.genre,r.year,r.minutes?r.minutes+" min":""].filter(Boolean).join(" · ");
-  card.append(h,a,m);
-  const details=document.createElement("details"),summary=document.createElement("summary");summary.textContent="Preview sleeve notes";details.append(summary);
-  for(const [label,key] of [["Hook","hook"],["Description","description"],["Listen when","listen_when"],["Listen for","listen_for"],["Why it's here","why_here"]]){
-   const p=document.createElement("p"),b=document.createElement("strong");b.textContent=label+": ";p.style.cssText="font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere";p.append(b,document.createTextNode(r[key]||"(Missing)"));details.append(p)
-  }
-  card.append(details);cards.append(card);
- }
+ card.append(details);return card;
 }
-$("previewSunday").onclick=()=>{collect();$("previewPanel").hidden=false;renderSundayPreview();$("previewPanel").scrollIntoView({behavior:"smooth",block:"start"})};
+function renderSundayPreview(){
+ const d=savedSundayPreview,time=$("previewTime").value,before=time==="before";
+ const hero=$("srFinalHero"),cards=$("previewCards"),checks=$("previewChecks");hero.replaceChildren();cards.replaceChildren();checks.replaceChildren();
+ if(!d){$("previewHeading").textContent="Sunday preview";$("previewMessage").textContent="Load the saved Cloudflare edition first.";return}
+ $("previewHeading").textContent=before?"Edition 1 — Saturday 24 October":"Edition "+d.edition_number+" — Sunday 25 October";
+ $("previewMessage").textContent=before?"The live Edition 1 remains visible at 23:59 on Saturday. No preview draft is published early.":"This is the saved Cloudflare draft, presented in the intended Sunday layout. It is a preview, not a publication.";
+ if(before){const p=document.createElement("p");p.textContent="Edition 1 is still live. At midnight, only a separately approved and scheduled edition can replace it.";hero.append(p);return}
+ const records=[...d.albums,...(d.limelight?[d.limelight]:[])];
+ const banner=document.createElement("div");banner.className="sr-final-hero";
+ const copy=document.createElement("div");copy.className="sr-final-copy";
+ const eyebrow=document.createElement("small");eyebrow.textContent="SUNDAY SELECTION";
+ const h=document.createElement("h2");h.append(document.createTextNode("Records for the week ahead."),document.createElement("br"));
+ const emphasis=document.createElement("em");emphasis.textContent="Find the one that stays with you.";h.append(emphasis);
+ const p=document.createElement("p");p.textContent="Pick something that catches your ear. Listen on your own music service. Come back with a feeling, a favourite moment, or a score.";
+ copy.append(eyebrow,h,p);banner.append(copy);
+ const collage=document.createElement("div");collage.className="sr-final-collage";
+ d.albums.forEach((r,i)=>{const b=document.createElement("div");b.className="sr-final-cover";const img=document.createElement("img");img.src=r.cover_url;img.alt=r.album+" — "+r.artist;img.loading="lazy";b.append(img);collage.append(b)});
+ banner.append(collage);
+ if(d.limelight){const feature=document.createElement("div");feature.className="sr-final-limelight";
+ const b=document.createElement("span");b.className="sr-final-badge";b.textContent="IN THE LIMELIGHT";
+ const img=document.createElement("img");img.src=d.limelight.cover_url;img.alt=d.limelight.album+" — "+d.limelight.artist;
+ const t=document.createElement("strong");t.textContent=d.limelight.artist+" — "+d.limelight.album;
+ feature.append(b,img,t);banner.append(feature)}
+ hero.append(banner);
+ const info=document.createElement("h3");info.textContent="The Sunday Rotation Club";hero.append(info);
+ const sub=document.createElement("p");sub.textContent="A selection across genres and moods.";hero.append(sub);
+ records.forEach((r,i)=>cards.append(previewRecord(r,i)));
+ const ready=validatePreview(d);
+ const check=document.createElement("p");check.textContent=(ready.length?"⚠ Editorial fields to check: "+ready.join(" · "):"✓ "+records.length+" records loaded from saved draft · "+(d.limelight?"10 regular + Limelight":"10 regular")+" · no database writes");checks.append(check);
+}
+$("previewSunday").onclick=async()=>{
+ $("previewPanel").hidden=false;
+ $("srSavedDraftPreviewStatus").textContent="Loading saved Cloudflare draft securely…";
+ $("previewPanel").scrollIntoView({behavior:"smooth",block:"start"});
+ try{
+  const date=$("start").value;
+  const result=await adminApi("/admin/draft?starts_on="+encodeURIComponent(date));
+  if(date!==$("start").value)throw Error("Edition changed during loading. Reopen the preview.");
+  if(!result.found)throw Error("No saved Cloudflare draft for this date.");
+  savedSundayPreview=result.draft;
+  $("srSavedDraftPreviewStatus").textContent="Read-only preview · Cloudflare draft version "+result.version+" · "+date+". Nothing scheduled or published.";
+  renderSundayPreview();
+ }catch(e){savedSundayPreview=null;$("srSavedDraftPreviewStatus").textContent="Preview unavailable: "+e.message;renderSundayPreview()}
+};
 $("previewTime").onchange=renderSundayPreview;
 $("closePreview").onclick=()=>{$("previewPanel").hidden=true};
 </script></html>
