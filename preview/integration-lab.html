@@ -1,10 +1,26 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Sunday Rotation · Isolated integration lab</title>
 <style>body{font:15px system-ui;background:#f2eee5;color:#242827;margin:0}.bar{padding:16px 22px;background:#fff;border-bottom:1px solid #ccc;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button{padding:10px;border:1px solid #777;background:#fff;cursor:pointer}button:focus{outline:2px solid #d85b37}#site{display:block;width:100%;height:calc(100vh - 156px);border:0}.note{padding:12px 22px;font-size:14px;background:#fff0e8;border-bottom:2px solid #d85b37;line-height:1.5}.note a{color:#8e321e;font-weight:700}select{padding:10px}</style>
-<div class="bar"><strong>Sunday Rotation · Integration lab (separate from live site)</strong><label>Simulated Berlin time <select id="at"><option value="one">Sat 24 Oct · 23:59</option><option value="two">Sun 25 Oct · 00:00</option><option value="summer">Sun 25 Oct · 02:30 CEST</option><option value="winter">Sun 25 Oct · 02:30 CET</option><option value="later">Sun 25 Oct · 05:00</option></select></label><button id="reload">Apply scenario</button><span id="status">Loading original site…</span></div>
-<div class="note"><strong>TEST MODE — real login and recovery keys do not work here.</strong> You are automatically signed in as a <strong>Test Listener</strong> using fake data. Please do not enter your real credentials. To sign in with your existing account, use the <a href="https://harry-lsc.github.io/sunday-rotation/" target="_blank" rel="noopener noreferrer">real Sunday Rotation site ↗</a> instead. The simulated date applies ONLY to the page below, not to the live website or another browser tab. This isolated test never publishes records or writes to the database. Edition 2 text is synthetic, not Cloudflare draft v31. Album covers are retrieved from Apple's public catalog, with clearly labelled placeholders if unavailable.</div><iframe title="Sunday Rotation isolated frontend" id="site" sandbox="allow-scripts allow-forms"></iframe>
+<div class="bar"><strong>Sunday Rotation · Integration lab (separate from live site)</strong><label>Simulated Berlin time <select id="at"><option value="one">Sat 24 Oct · 23:59</option><option value="two">Sun 25 Oct · 00:00</option><option value="summer">Sun 25 Oct · 02:30 CEST</option><option value="winter">Sun 25 Oct · 02:30 CET</option><option value="later">Sun 25 Oct · 05:00</option></select></label><button id="reload">Apply scenario</button><label>Approved edition JSON <input id="draftFile" type="file" accept=".json,application/json"></label><button id="clearDraft" type="button">Use synthetic fixture</button><span id="status">Loading original site…</span></div>
+<div class="note"><strong>TEST MODE — real login and recovery keys do not work here.</strong> You are automatically signed in as a <strong>Test Listener</strong> using fake data. Please do not enter your real credentials. To sign in with your existing account, use the <a href="https://harry-lsc.github.io/sunday-rotation/" target="_blank" rel="noopener noreferrer">real Sunday Rotation site ↗</a> instead. To test the authentic editorial text, use Admin Studio → Edition 2 → Download backup, then select that JSON using the file field above. The file remains in your browser. The simulated date applies ONLY to the page below, not to the live website or another browser tab. This isolated test never publishes records or writes to the database. Edition 2 text is synthetic, not Cloudflare draft v31. Album covers are retrieved from Apple's public catalog, with clearly labelled placeholders if unavailable.</div><iframe title="Sunday Rotation isolated frontend" id="site" sandbox="allow-scripts allow-forms"></iframe>
 <script>
 const sample=[['Kimbra','Vows (Deluxe Version)',2011,'518500009'],['Kacey Musgraves','Golden Hour',2018,'1440918116'],['Sons of Town Hall','The Adventures of the Sons of Town Hall',2019,'1696844519'],['The Gaslight Anthem',"The \'59 Sound",2008,'1880812196'],['Billie Holiday','Lady Sings the Blues',1956,'1469582218'],['Little Dragon','Ritual Union',2011,'444929109'],['Neutral Milk Hotel','In the Aeroplane Over the Sea',1998,'1839077554'],['Wenzel','Stirb mit mir ein Stück - Liebeslieder',1986,'1632902709'],['The Dave Brubeck Quartet','Time Out',1959,'292800458'],['Judas Priest','Painkiller (Bonus Track Version)',1990,'207178142'],['Thelma Houston','Any Way You Like It',1976,'1439279410']];
 const scenarios={one:false,two:true,summer:true,winter:true,later:true};
+let cloudExport=null;
+const dateWanted='2026-10-25';
+const safeRecord=(r,i)=>({
+ id:String(r.catalog_id||r.id||''),
+ artist:String(r.artist||''),title:String(r.album||r.title||''),genre:String(r.genre||'Music'),year:Number(r.year)||null,minutes:Number(r.minutes)||null,
+ hook:String(r.hook||''),desc:String(r.description||r.desc||''),mood:String(r.listen_when||''),sound:String(r.listen_for||''),why:String(r.why_here||''),
+ cover:String(r.cover_url||r.cover||''),tracks:[],isLimelight:i===10
+});
+function validateExport(d){
+ if(d?.format!=='sunday-rotation-edition-preview-v1'||d.starts_on!==dateWanted||d.edition_number!==2||!Array.isArray(d.albums)||d.albums.length!==10)throw Error('Expected Edition 2 backup for 2026-10-25 containing 10 regular albums');
+ const records=[...d.albums,...(d.limelight?[d.limelight]:[])].map(safeRecord);
+ if(records.some(r=>!/^\\d{5,20}$/.test(r.id)||!r.artist||!r.title||!r.cover))throw Error('An album is missing catalogue ID, artist, title or cover');
+ if(new Set(records.map(r=>r.id)).size!==records.length)throw Error('Duplicate catalogue IDs');
+ return records;
+}
+
 function artworkFallback(r,i){
  const shades=['#52263a','#c1a36a','#183b45','#851f27','#342b51','#d6a85a','#8c643b','#395f44','#345b83','#662b2b','#9e4d54'];
  const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
@@ -34,13 +50,15 @@ html=html.replace('Ten records for the week ahead.','Records for the week ahead.
 
 if(!html.includes('const ENABLE_EDITION_LOADER=false;')||!html.includes('loadPublishedEdition();'))throw Error('Production adapter changed: stopping rather than guessing.');
 const isE2=scenarios[document.getElementById('at').value];
-const fixtures=await Promise.all(sample.map(resolveArtwork));
+const fixtures=cloudExport?null:await Promise.all(sample.map(resolveArtwork));
+const prepared=cloudExport||fixtures.map((r,i)=>({id:r[3],artist:r[0],title:r[1],genre:['Pop','Country','Folk','Rock','Jazz','Electronic','Indie','Folk','Jazz','Metal','Disco'][i],year:r[2],minutes:null,hook:'Synthetic integration fixture',desc:'Synthetic testing content, not the authoritative v31 draft.',mood:'A moment for discovery',sound:'Listen closely',why:'Selected for the integration test',cover:r[4],tracks:[],isLimelight:i===10}));
+
 const stage=`
 /* Isolated synthetic test: do not connect to production as a member. */
-const __labData=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(fixtures))}"));
-const __labTwo=__labData.map((r,i)=>({id:r[3],artist:r[0],title:r[1],genre:['Pop','Country','Folk','Rock','Jazz','Electronic','Indie','Folk','Jazz','Metal','Disco'][i],year:r[2],minutes:null,hook:'Synthetic integration fixture',desc:'Synthetic testing content, not the authoritative v31 draft.',mood:'A moment for discovery',sound:'Listen closely',why:'Selected for the integration test',cover:r[4],tracks:[],isLimelight:i===10}));
+const __labData=JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(prepared))}"));
+const __labTwo=__labData;
 account={display_name:'Test Listener',listener_id:'0000000000'};token='synthetic-offline-only';showAccount();gate(false);
-shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
+if(${isE2})shelfEditions.set(1,{date:'18–24 October 2026',albums:editionOneAlbums});
 for(const r of editionOneAlbums)albumHistory.set(r.id,r);
 if(${isE2}){
 activeEdition=2;browsingEdition=2;currentEditionAlbums=__labTwo;albums=__labTwo;
@@ -85,7 +103,7 @@ if(${isE2}){
   renderShelf=function(){oldRenderShelf();const card=document.querySelectorAll('#shelf .card')[10];if(card){const label=badge();label.style.marginBottom='9px';card.prepend(label)}};
  }
 }
-const __labArtReal=__labData.filter(r=>r[5]).length;
+const __labArtReal=${cloudExport?'__labData.filter(r=>!!r.cover).length':'0'};
 const __labExpected=${isE2}?'Vows (Deluxe Version)':'Bryter Layter';
 const __labCards=[...document.querySelectorAll('#shelf .card h3')].map(x=>x.textContent);
 const __labTab=[...document.querySelectorAll('#albumTabs .album-tab strong')].map(x=>x.textContent);
@@ -109,6 +127,16 @@ html=html.replace('<script>let albums=',guard+'<style>#memberGate{display:none!i
 document.getElementById('site').srcdoc=html;status.textContent='Checking actual rendered edition…';
 }catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
 }
-window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10)&&event.data.domVerified&&event.data.copyVerified&&event.data.renderedCards===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · '+event.data.artworkResolved+'/11 covers loaded · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
+window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10)&&event.data.domVerified&&event.data.copyVerified&&event.data.renderedCards===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · '+event.data.artworkResolved+' artwork URLs · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
+document.getElementById('draftFile').onchange=async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  if(f.size>500000)throw Error('Backup too large');
+  cloudExport=validateExport(JSON.parse(await f.text()));
+  document.getElementById('status').textContent='Edition 2 JSON accepted locally · '+cloudExport.length+' albums. No upload performed.';
+  await load();
+ }catch(err){cloudExport=null;document.getElementById('status').textContent='Import rejected: '+err.message}
+};
+document.getElementById('clearDraft').onclick=()=>{cloudExport=null;document.getElementById('draftFile').value='';load()};
 document.getElementById('reload').onclick=load;document.getElementById('at').onchange=load;load();
 </script></html>
