@@ -16,7 +16,7 @@ const safeRecord=(r,i)=>({
 function validateExport(d){
  if(d?.format!=='sunday-rotation-edition-preview-v1'||d.starts_on!==dateWanted||d.edition_number!==2||!Array.isArray(d.albums)||d.albums.length!==10)throw Error('Expected Edition 2 backup for 2026-10-25 containing 10 regular albums');
  const records=[...d.albums,...(d.limelight?[d.limelight]:[])].map(safeRecord);
- if(records.some(r=>!/^\\d{5,20}$/.test(r.id)||!r.artist||!r.title||!r.cover))throw Error('An album is missing catalogue ID, artist, title or cover');
+ if(records.some(r=>!/^[0-9]{5,20}$/.test(r.id)||!r.artist||!r.title||!r.cover))throw Error('An album is missing catalogue ID, artist, title or cover');
  if(new Set(records.map(r=>r.id)).size!==records.length)throw Error('Duplicate catalogue IDs');
  return records;
 }
@@ -103,8 +103,8 @@ if(${isE2}){
   renderShelf=function(){oldRenderShelf();const card=document.querySelectorAll('#shelf .card')[10];if(card){const label=badge();label.style.marginBottom='9px';card.prepend(label)}};
  }
 }
-const __labArtReal=${cloudExport?'__labData.filter(r=>!!r.cover).length':'0'};
-const __labExpected=${isE2}?'Vows (Deluxe Version)':'Bryter Layter';
+const __labArtReal=__labData.filter(r=>!!r.cover).length;
+const __labExpected=${isE2}?(cloudExport?.[0]?.title||'Vows (Deluxe Version)'):'Bryter Layter';
 const __labCards=[...document.querySelectorAll('#shelf .card h3')].map(x=>x.textContent);
 const __labTab=[...document.querySelectorAll('#albumTabs .album-tab strong')].map(x=>x.textContent);
 const __labVisible=__labCards.includes(__labExpected)&&__labTab.includes(__labExpected)&&document.querySelector('.edition-current')?.textContent.includes('Edition '+String(activeEdition).padStart(2,'0'));
@@ -127,7 +127,7 @@ html=html.replace('<script>let albums=',guard+'<style>#memberGate{display:none!i
 document.getElementById('site').srcdoc=html;status.textContent='Checking actual rendered edition…';
 }catch(err){status.textContent='Stopped: '+err.message;console.error(err)}
 }
-window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===(selected===2?11:10)&&event.data.domVerified&&event.data.copyVerified&&event.data.renderedCards===(selected===2?11:10);s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · '+event.data.artworkResolved+' artwork URLs · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
+window.addEventListener('message',event=>{if(event.source!==document.getElementById('site').contentWindow||event.data?.kind!=='sr-lab')return;const s=document.getElementById('status');if(!event.data.ok){s.textContent='TEST ERROR: '+event.data.error;return;}const selected=scenarios[document.getElementById('at').value]?2:1;const expectedCount=selected===2?(cloudExport?.length||11):10;const valid=event.data.active===selected&&event.data.shown===selected&&event.data.count===expectedCount&&event.data.domVerified&&event.data.copyVerified&&event.data.renderedCards===expectedCount;s.textContent=(valid?'PASS':'FAIL')+' · visible Edition '+event.data.shown+' · '+event.data.renderedCards+' visible cards · copy '+(event.data.copyVerified?'OK':'FAILED')+' · '+event.data.artworkResolved+' artwork URLs · '+event.data.renderedFirst;document.getElementById('site').style.visibility=valid?'visible':'hidden';});
 document.getElementById('draftFile').onchange=async e=>{
  const f=e.target.files?.[0];if(!f)return;
  try{
