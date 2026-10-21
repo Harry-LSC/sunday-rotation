@@ -51,12 +51,12 @@ async function journal(request,db,listener){
   return reply({saved:true,album_id:id});
 }
 async function deleteRating(id,db,listener){
-  if(!albums.has(id))return error("Unknown album");
+  if(!(await knownAlbum(db,id)))return error("Unknown album");
   const result=await db.prepare("DELETE FROM journal_entries WHERE listener_id=? AND album_id=?").bind(listener.listener_id,id).run();
   return reply({deleted:true,album_id:id,changes:result.meta?.changes??0});
 }
 async function score(id,db,listener){
-  if(!albums.has(id))return error("Unknown album");
+  if(!(await knownAlbum(db,id)))return error("Unknown album");
   const mine=await db.prepare("SELECT score FROM journal_entries WHERE listener_id=? AND album_id=? AND status='rated' AND score IS NOT NULL").bind(listener.listener_id,id).first();
   if(!mine)return reply({available:false,message:"Rate this album to reveal the club score"});
   const r=await db.prepare("SELECT COUNT(*) AS count,ROUND(AVG(score),2) AS average FROM journal_entries WHERE album_id=? AND status='rated' AND score IS NOT NULL").bind(id).first();
