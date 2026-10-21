@@ -30,7 +30,7 @@
 <div class="card"><div class="cardtop"><div><h2>The main selection</h2><div class="muted">Ten albums · Genres can change every week</div></div><span class="num">10</span></div></div>
 <div class="genre-board"><div class="cardtop"><strong>Genre compass</strong><span class="muted" id="genreCount">0 of 10 chosen</span></div><p class="muted">A guide to variety, never a rule. Genres light up as you add albums.</p><div id="genreLights" class="genre-lights" aria-live="polite"></div></div><div class="card" id="selectionCompass"><h2>Selection balance</h2><p class="muted">Editorial guidance based on entered genres, release years and optional mood tags. No genre, decade or mood is compulsory.</p><div id="balanceMeters" class="balance-grid"></div><p class="muted" id="balanceAdvice" aria-live="polite"></p></div><div id="cards"></div>
 <div class="card limelight"><div class="cardtop"><div><h2>In the Limelight</h2><div class="muted">Optional classic, cult favourite or personal landmark</div></div><input type="checkbox" id="addLight" aria-label="Add Limelight album" style="width:25px;min-height:25px"></div><div id="lightFields"></div></div>
-<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="validatePublication">Validate saved edition</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div><div id="publicationValidationResults" role="status" aria-live="polite"></div>
+<div class="actions"><button id="save" class="primary">Save draft to Cloudflare</button><button id="download">Download backup ↓</button><button type="button" id="previewSunday">Preview Sunday ↗</button><button type="button" id="testWorker">Test Cloudflare connection</button><button type="button" id="validatePublication">Validate saved edition</button><button type="button" id="dryRunChangeover">Test Sunday changeover</button><button type="button" id="schedule" disabled title="Requires secure Cloudflare admin authentication">Schedule edition (coming soon)</button></div><div class="status" id="status" role="status"></div><div id="workerTestResults" role="status" aria-live="polite"></div><div id="publicationValidationResults" role="status" aria-live="polite"></div><div id="changeoverResults" role="status" aria-live="polite" style="white-space:pre-line"></div>
 <section class="card" id="previewPanel" hidden style="margin-top:18px">
  <div class="cardtop"><div><div class="eyebrow">SAFE DRY RUN · NO PUBLICATION</div><h2 id="previewHeading">Sunday preview</h2></div><button type="button" id="closePreview">Close</button></div>
  <p class="muted" id="previewMessage"></p>
@@ -81,6 +81,21 @@ const $=id=>document.getElementById(id);
 const API="https://sunday-rotation-api.linealsportchamp.workers.dev";
 let adminToken=null;
 
+$("dryRunChangeover").onclick=async()=>{
+ const button=$("dryRunChangeover"),target=$("changeoverResults"),date=$("start").value;
+ button.disabled=true;target.textContent="Running read-only changeover simulation against saved Cloudflare draft…";
+ try{
+  const data=await adminApi("/admin/changeover-dry-run?starts_on="+encodeURIComponent(date));
+  if(date!==$("start").value){target.textContent="Edition changed during the test; please rerun.";return}
+  const lines=[(data.pass?"PASS":"FAILED")+" · Cloud draft version "+data.saved_version+" · "+data.album_count+" records",
+   ...(data.checks||[]).map(r=>(r.pass?"✓":"✗")+" "+r.label+" → Berlin "+r.berlin_date+" → Edition "+r.selected_edition),
+   "The Shelf: Edition 1 eligible after midnight (backend date rule).",
+   "No scheduling, publication or journal changes performed."];
+  if(data.issues)lines.push(...data.issues);
+  target.textContent=lines.join("\n");
+ }catch(e){target.textContent="Dry-run unavailable: "+e.message+". Confirm Worker deployment."}
+ finally{button.disabled=false}
+};
 $("validatePublication").onclick=async()=>{
  const button=$("validatePublication"),display=$("publicationValidationResults");
  button.disabled=true;display.textContent="Checking the saved Cloudflare edition…";
