@@ -444,26 +444,51 @@ async function loadArchiveShelf(){
 }
 function openArchiveNotes(item){
  const container=document.getElementById("archiveRecords");
- if(!container)return;
+ if(!container||!account)return;
  container.replaceChildren();container.classList.remove("archive-grid");
- const back=document.createElement("button");
- back.type="button";back.textContent="← Back to The Shelf";back.onclick=renderArchiveShelf;
- container.append(back);
+ const back=document.createElement("button");back.type="button";back.textContent="← Back to The Shelf";back.onclick=renderArchiveShelf;container.append(back);
  const info=document.createElement("p");info.className="muted";info.textContent="From Edition "+String(item.n).padStart(2,"0")+" · "+item.date;container.append(info);
- const article=document.createElement("article");article.className="archive-record";
- const img=document.createElement("img");img.src=item.a.cover;img.alt=item.a.title+" cover";
- const notes=document.createElement("div");
- const title=document.createElement("h2");title.textContent=item.a.artist+" — "+item.a.title;notes.append(title);
- const meta=document.createElement("p");meta.textContent=[item.a.genre,item.a.year,item.a.minutes?item.a.minutes+" min":""].filter(Boolean).join(" · ");notes.append(meta);
- for(const [label,value] of [["",item.a.desc],["Listen when",item.a.mood],["Listen for",item.a.sound],["Why it's here",item.a.why]]){
-  if(!value)continue;
-  if(label){const h=document.createElement("h3");h.textContent=label;notes.append(h)}
-  const p=document.createElement("p");
-  if(label==="Why it's here")renderItalicMarkers(p,value);
-  else p.textContent=value;
-  notes.append(p);
+ // Reuse the actual This Week Sleeve Notes markup and responsive CSS, rather than a separate archive layout.
+ const liveSleeve=document.querySelectorAll("main > section")[2];
+ const split=liveSleeve?.querySelector(".split");
+ const noteGrid=liveSleeve?.querySelector(".sleeve-notes-grid");
+ if(!split||!noteGrid){const msg=document.createElement("p");msg.textContent="Album details temporarily unavailable.";container.append(msg);return}
+ const details=split.cloneNode(true),notes=noteGrid.cloneNode(true);
+ const get=id=>details.querySelector("#"+id)||notes.querySelector("#"+id);
+ const a=item.a;
+ get("detailCover").replaceChildren(Object.assign(document.createElement("img"),{src:a.cover,alt:a.title+" — "+a.artist+" album cover"}));
+ get("detailMeta").textContent=[a.genre||"Music",a.year,a.minutes?"approximately "+a.minutes+" minutes":""].filter(Boolean).join(" · ");
+ for(const [id,value] of Object.entries({detailTitle:a.title,detailArtist:a.artist,detailHook:a.hook,detailDesc:a.desc,detailMood:a.mood,detailSound:a.sound,detailWhy:a.why})){
+  const node=get(id);if(node){if(id==="detailWhy")renderItalicMarkers(node,value);else node.textContent=value||""}
  }
- article.append(img,notes);container.append(article);
+ const links=get("listenLinks");
+ const q=encodeURIComponent(a.artist+" "+a.title);
+ if(links){
+  const anchors=links.querySelectorAll("a");
+  const destinations=[
+   "https://open.spotify.com/search/"+q,
+   a.source&&/^https:\/\//.test(a.source)?a.source:"https://music.apple.com/us/search?term="+q,
+   "https://www.youtube.com/results?search_query="+q,
+   "https://tidal.com/search?q="+q
+  ];
+  anchors.forEach((link,i)=>{if(destinations[i])link.href=destinations[i]});
+ }
+ // This button uses the existing edition/journal flows; no duplicate ratings database.
+ const rateButton=details.querySelector("button");
+ if(rateButton){rateButton.onclick=()=>{
+   browseEdition(item.n);
+   const index=albums.findIndex(record=>String(record.id)===String(a.id));
+   if(index>=0){select(index);openReview()}
+ }}
+ const rating=document.createElement("p");rating.className="sr-archive-club-score muted";rating.textContent="Checking club rating…";
+ details.querySelector(".split > div:last-child")?.append(rating);
+ for(const node of [details,notes])node.querySelectorAll("[id]").forEach(el=>el.removeAttribute("id"));
+ container.append(details,notes);
+ const credits=document.createElement("p");credits.className="fineprint";credits.textContent="Album details and artwork: Apple Music / iTunes catalogue. Listening notes are Sunday Rotation editorial impressions.";container.append(credits);
+ call("/club-score?album_id="+encodeURIComponent(String(a.id))).then(result=>{
+  if(!rating.isConnected)return;
+  rating.textContent=result.available?"The club's verdict: "+Number(result.average).toFixed(1)+" / 10 · "+result.count+" listener"+(result.count===1?"":"s"):"Rate this album to reveal the club score.";
+ }).catch(()=>{if(rating.isConnected)rating.textContent="Club score temporarily unavailable."});
 }
 const archiveStyles=document.createElement("style");
 archiveStyles.textContent=".archive-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0}.archive-toolbar input{flex:2 1 220px;min-width:0}.archive-toolbar select{flex:1 1 160px;min-width:0}.archive-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px}.archive-grid .archive-album-card{min-width:0}.archive-grid .archive-album-card .cover{margin-bottom:12px}.archive-grid .archive-album-card .cover img{width:100%;height:100%;object-fit:cover}.archive-grid .archive-album-card h3{overflow-wrap:anywhere;margin:10px 0 6px!important}.archive-grid .archive-album-card p{margin:6px 0}.archive-grid .archive-album-card button{margin-top:12px}.archive-grid .sr-limelight-badge{margin-bottom:9px}@media(max-width:1100px){.archive-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:700px){.archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.archive-toolbar{align-items:stretch}.archive-toolbar input{flex-basis:100%}.archive-toolbar select{flex:1 1 130px}}@media(max-width:410px){.archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.archive-grid .archive-album-card{font-size:13px}.archive-grid .archive-album-card h3{font-size:19px}}";
