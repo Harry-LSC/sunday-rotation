@@ -481,7 +481,7 @@ function openArchiveNotes(item){
    if(index>=0){select(index);openReview()}
  }}
  const rating=document.createElement("p");rating.className="sr-archive-club-score muted";rating.textContent="Checking club rating…";
- details.querySelector(".split > div:last-child")?.append(rating);
+ details.querySelector(":scope > div:last-child")?.append(rating);
  for(const node of [details,notes])node.querySelectorAll("[id]").forEach(el=>el.removeAttribute("id"));
  container.append(details,notes);
  const credits=document.createElement("p");credits.className="fineprint";credits.textContent="Album details and artwork: Apple Music / iTunes catalogue. Listening notes are Sunday Rotation editorial impressions.";container.append(credits);
