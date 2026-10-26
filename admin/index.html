@@ -614,7 +614,7 @@ function renderMembers(){
 }
 async function refreshMembers(){
   $("membersStatus").textContent="Loading members…";$("membersList").replaceChildren();
-  try{const data=await adminApi("/admin/members");memberActivity=Array.isArray(data.members)?data.members:[];renderMembers()}
+  try{const data=await adminApi("/admin/members");if(!Array.isArray(data.members)||data.members.some(m=>!m||typeof m!=="object"||!Array.isArray(m.ratings))){$("membersStatus").textContent="Activity view is awaiting the matching Cloudflare Worker deployment. Existing member data is unchanged.";return}memberActivity=data.members;renderMembers()}
   catch(e){$("membersStatus").textContent="Could not load members: "+e.message}
 }
 $("membersFilter").onchange=renderMembers;$("membersSort").onchange=renderMembers;
