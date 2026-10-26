@@ -321,7 +321,7 @@ async function fetchAlbumById(type,i){
   const box=$("results-"+type+"-"+i);
   const raw=input.value.trim();
   // Apple Music links contain /id123; bare numeric Apple collection IDs are also accepted.
-  const match=/^\\d{5,20}$/.test(raw)?[raw,raw]:raw.match(/\\/id(\\d{5,20})(?:[/?#]|$)/i);
+  const match=/^\d{5,20}$/.test(raw)?[raw,raw]:raw.match(/\/id(\d{5,20})(?:[/?#]|$)/i);
   if(!match){box.textContent="Enter a numeric Apple Music album ID or an album link containing /id123…";return}
   const id=match[1];
   box.textContent="Looking up exact album ID…";
