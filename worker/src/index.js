@@ -312,8 +312,37 @@ async function adminSchedule(request,url,db,listener){
 
 async function adminMembers(db,listener){
   if(listener.listener_id!==ADMIN_LISTENER_ID)return error("Not authorized",403);
-  const result=await db.prepare("SELECT display_name FROM listeners ORDER BY created_at DESC LIMIT 5000").all();
-  return reply({members:(result.results||[]).map(x=>x.display_name)});
+  // Admin-only engagement signals. Do not expose private notes or mood fields.
+  await suggestionSchema(db);
+  const [people,journals,suggestions,editions]=await Promise.all([
+    db.prepare("SELECT listener_id,display_name,created_at FROM listeners ORDER BY created_at DESC LIMIT 5000").all(),
+    db.prepare("SELECT listener_id,album_id,status,score,updated_at FROM journal_entries ORDER BY updated_at DESC LIMIT 20000").all(),
+    db.prepare("SELECT listener_id,COUNT(*) AS total,MAX(created_at) AS last_suggestion FROM suggestion_contributors GROUP BY listener_id").all(),
+    db.prepare("SELECT payload_json FROM scheduled_editions ORDER BY starts_on DESC LIMIT 520").all().catch(()=>({results:[]}))
+  ]);
+  const albumNames=new Map();
+  for(const edition of editions.results||[]){
+    try{
+      const payload=JSON.parse(edition.payload_json);
+      for(const a of [...(payload.albums||[]),...(payload.limelight?[payload.limelight]:[])])
+        if(a.catalog_id)albumNames.set(String(a.catalog_id),a.artist+" — "+a.album);
+    }catch{}
+  }
+  const activity=new Map();
+  for(const row of journals.results||[]){
+    if(!activity.has(row.listener_id))activity.set(row.listener_id,[]);
+    activity.get(row.listener_id).push({album_id:row.album_id,album:albumNames.get(String(row.album_id))||"Album #"+row.album_id,status:row.status,score:row.score,updated_at:row.updated_at});
+  }
+  const suggestionsByMember=new Map((suggestions.results||[]).map(x=>[x.listener_id,x]));
+  return reply({members:(people.results||[]).map(p=>{
+    const entries=activity.get(p.listener_id)||[],suggest=suggestionsByMember.get(p.listener_id);
+    const last=[entries[0]?.updated_at,suggest?.last_suggestion].filter(Boolean).sort().at(-1)||null;
+    return {listener_id:p.listener_id,display_name:p.display_name,joined_at:p.created_at,
+      rated:entries.filter(e=>e.status==="rated").length,
+      listened:entries.filter(e=>e.status==="listened").length,
+      want_to_listen:entries.filter(e=>e.status==="want_to_listen").length,
+      suggestions:Number(suggest?.total||0),last_activity:last,ratings:entries.filter(e=>e.status==="rated").map(e=>({album:e.album,album_id:e.album_id,score:e.score,updated_at:e.updated_at}))};
+  })});
 }
 
 async function recordLibrary(request,db,listener){
@@ -325,6 +354,25 @@ async function recordLibrary(request,db,listener){
     artist TEXT NOT NULL, album TEXT NOT NULL, genre TEXT,
     year INTEGER, note TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`).run();
+  // Removing an item only affects the admin catalogue view; member contributions,
+  // scheduled/published editions and journal records remain unchanged.
+  await db.prepare("CREATE TABLE IF NOT EXISTS library_hidden (album_key TEXT PRIMARY KEY,hidden_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+  if(request.method==="DELETE"){
+    const input=await parse(request);
+    if(!Array.isArray(input?.keys)||!input.keys.length||input.keys.length>100||
+      input.keys.some(k=>typeof k!=="string"||k.length>400||!k.includes("::")))return error("Select 1–100 library records");
+    const keys=[...new Set(input.keys)];
+    for(const key of keys)await db.prepare("INSERT OR IGNORE INTO library_hidden(album_key) VALUES(?)").bind(key).run();
+    return reply({removed:keys.length});
+  }
+  if(request.method==="PATCH"){
+    const input=await parse(request);
+    if(!Array.isArray(input?.keys)||!input.keys.length||input.keys.length>100||
+      input.keys.some(k=>typeof k!=="string"||k.length>400||!k.includes("::")))return error("Select 1–100 records to restore");
+    const keys=[...new Set(input.keys)];
+    for(const key of keys)await db.prepare("DELETE FROM library_hidden WHERE album_key=?").bind(key).run();
+    return reply({restored:keys.length});
+  }
   if(request.method==="POST"){
     const input=await parse(request);
     const artist=typeof input?.artist==="string"?input.artist.trim():"";
@@ -376,7 +424,8 @@ async function recordLibrary(request,db,listener){
     for(const item of [...(Array.isArray(obj.albums)?obj.albums:[]),...(obj.limelight?[obj.limelight]:[])])
       add(item.artist,item.album,{genre:item.genre,year:item.year,source:"Edition draft",edition:d.edition_number});
   }
-  return reply({albums:[...all.values()],draft_count:(drafts.results||[]).length});
+  const hidden=await db.prepare("SELECT album_key FROM library_hidden LIMIT 5000").all();
+  return reply({albums:[...all.values()],hidden_keys:(hidden.results||[]).map(x=>x.album_key),draft_count:(drafts.results||[]).length});
 }
 
 async function generateSleeveNotes(request,env,listener){
@@ -454,7 +503,7 @@ export default {
         else if(u.pathname==="/suggestions"&&request.method==="POST")res=await submitSuggestion(await parse(request),env.DB,listener);
         else if(u.pathname==="/admin/members"&&request.method==="GET")res=await adminMembers(env.DB,listener);
         else if(u.pathname==="/admin/suggestions"&&["GET","PUT"].includes(request.method))res=await adminSuggestions(request,u,env.DB,listener);
-        else if(u.pathname==="/admin/library"&&["GET","POST","PUT"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
+        else if(u.pathname==="/admin/library"&&["GET","POST","PUT","DELETE","PATCH"].includes(request.method))res=await recordLibrary(request,env.DB,listener);
         else if(u.pathname==="/admin/draft"&&["GET","PUT"].includes(request.method))res=await adminDraft(request,u,env.DB,listener);
         else if(u.pathname==="/admin/changeover-dry-run"&&request.method==="GET")res=await dryRunChangeover(u,env.DB,listener);
         else if(u.pathname==="/admin/validate-publication"&&request.method==="GET")res=await validateSavedPublication(u,env.DB,listener);
