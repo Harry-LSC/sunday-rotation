@@ -90,16 +90,16 @@
 <section class="admin-panel" id="panel-library" hidden>
 <div class="eyebrow">THE CLUB'S COLLECTION</div><h1>Record Library.</h1>
 <p class="intro">Your growing catalogue of listener suggestions, edition drafts and played albums. Includes who suggested each album and their comments. Nothing here publishes an edition.</p>
-<div class="toolbar"><input id="librarySearch" aria-label="Search records" placeholder="Search artist, album, genre or source" style="flex:2;min-width:180px"><select id="libraryFilter" aria-label="Filter records" style="flex:1;min-width:160px"><option value="">All records</option><option value="unpublished">Not yet published</option><option value="Published">Published</option><option value="Edition draft">Edition drafts</option><option value="Suggestion">Suggestions</option><option value="Manual">Manual additions</option></select><select id="librarySort" aria-label="Sort records" style="flex:1;min-width:160px"><option value="status">Published first</option><option value="artist">Artist A–Z</option><option value="year">Year newest first</option><option value="supporters">Most suggested</option></select><button type="button" id="libraryRefresh">Refresh ↻</button><button type="button" id="libraryExport">Export CSV ↓</button></div>
+<div class="toolbar"><input id="librarySearch" aria-label="Search records" placeholder="Search artist, album, genre or source" style="flex:2;min-width:180px"><select id="libraryFilter" aria-label="Filter records" style="flex:1;min-width:160px"><option value="">All records</option><option value="unpublished">Not yet published</option><option value="Published">Published</option><option value="Edition draft">Edition drafts</option><option value="Suggestion">Suggestions</option><option value="Manual">Manual additions</option><option value="hidden">Removed from library</option></select><select id="librarySort" aria-label="Sort records" style="flex:1;min-width:160px"><option value="status">Published first</option><option value="artist">Artist A–Z</option><option value="year">Year newest first</option><option value="supporters">Most suggested</option></select><button type="button" id="libraryRefresh">Refresh ↻</button><button type="button" id="libraryExport">Export CSV ↓</button><button type="button" id="libraryRemove" disabled>Remove selected</button><button type="button" id="libraryRestore" disabled hidden>Restore selected</button></div>
 <p id="libraryStatus" class="muted" role="status">Open this tab to load the catalogue.</p>
-<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px;background:#f8f5ee;font-size:13px" id="libraryTable"><thead><tr><th>Artist</th><th>Album</th><th>Genre</th><th>Year</th><th>Provenance</th><th>Edition(s)</th><th>Suggestions</th><th>Use</th></tr></thead><tbody id="libraryBody"></tbody></table></div>
+<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:700px;background:#f8f5ee;font-size:13px" id="libraryTable"><thead><tr><th><input type="checkbox" id="librarySelectAll" aria-label="Select all displayed records"></th><th>Artist</th><th>Album</th><th>Genre</th><th>Year</th><th>Provenance</th><th>Edition(s)</th><th>Suggestions</th><th>Use</th></tr></thead><tbody id="libraryBody"></tbody></table></div>
 <div class="card"><h2>Add a record</h2><p class="muted">For curator discoveries not submitted by listeners. Artist and title are used to detect duplicates.</p>
 <form id="libraryAdd"><div class="fields"><div><label>Artist<input name="artist" required maxlength="120"></label></div><div><label>Album<input name="album" required maxlength="180"></label></div><div><label>Genre<input name="genre" maxlength="120"></label></div><div><label>Year<input name="year" type="number" min="1850" max="2200"></label></div></div><div class="actions"><button class="primary" type="submit">Add to library</button></div></form></div>
 </section>
 <style>#libraryTable th,#libraryTable td{text-align:left;vertical-align:top;padding:10px 9px;border-bottom:1px solid var(--line)}#libraryTable th{position:sticky;top:0;background:#e9e5db}#libraryTable td button{font-size:12px;padding:5px 10px;min-height:34px}</style>
 <section class="admin-panel" id="panel-members" hidden>
 <div class="eyebrow">THE LISTENING CLUB</div><h1>Members.</h1>
-<p class="intro">Registered display names only. Private to the administrator.</p>
+<p class="intro">Admin-only activity from ratings, listening status and suggestions. No private notes or moods are shown. No recorded activity does not necessarily mean someone has stopped listening.</p><div class="toolbar"><select id="membersFilter"><option value="all">All members</option><option value="recent">Active in last 14 days</option><option value="quiet">No activity in last 14 days</option><option value="none">No recorded activity</option></select><select id="membersSort"><option value="activity">Most recently active</option><option value="ratings">Most ratings</option><option value="name">Name A–Z</option></select></div>
 <div id="membersStatus" class="muted" role="status">Open this tab to load members.</div>
 <div id="membersList" class="card" style="display:grid;gap:10px"></div>
 </section>
@@ -496,6 +496,7 @@ $("settingsImport").onchange=async event=>{
 };
 
 let libraryItems=[];
+let hiddenLibraryKeys=new Set(), selectedLibraryKeys=new Set();
 function normalizeLibraryKey(artist,album){return [artist,album].map(s=>String(s||"").normalize("NFKC").toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu," ")).join("::")}
 async function refreshLibrary(){
   $("libraryStatus").textContent="Loading records…";
@@ -514,19 +515,22 @@ async function refreshLibrary(){
       if(!x.year)x.year=a.year;
       records.set(key,x);
     }
+    hiddenLibraryKeys=new Set(cloud.hidden_keys||[]);
+    selectedLibraryKeys.clear();
     libraryItems=[...records.values()].sort((a,b)=>a.artist.localeCompare(b.artist)||a.album.localeCompare(b.album));
     renderLibrary();
   }catch(e){$("libraryStatus").textContent="Library could not load: "+e.message}
 }
 function renderLibrary(){
   const q=$("librarySearch").value.trim().toLocaleLowerCase(),filter=$("libraryFilter").value;
-  const shown=libraryItems.filter(a=>(!filter||(filter==="unpublished"?!a.sources.includes("Published"):a.sources.includes(filter)))&&
+  const shown=libraryItems.filter(a=>(filter==="hidden"?hiddenLibraryKeys.has(a.key):!hiddenLibraryKeys.has(a.key)&&(!filter||(filter==="unpublished"?!a.sources.includes("Published"):a.sources.includes(filter))))&&
     [a.artist,a.album,a.genre,(a.sources||[]).join(" "),(a.reasons||[]).map(r=>r.reason+" "+r.listener_name).join(" ")].join(" ").toLocaleLowerCase().includes(q));
   const sort=$("librarySort").value;
   shown.sort((a,b)=>sort==="artist"?a.artist.localeCompare(b.artist)||a.album.localeCompare(b.album):sort==="year"?(Number(b.year)||0)-(Number(a.year)||0):sort==="supporters"?(b.supporters||0)-(a.supporters||0):Number(b.sources.includes("Published"))-Number(a.sources.includes("Published"))||Number(b.sources.includes("Suggestion"))-Number(a.sources.includes("Suggestion"))||a.artist.localeCompare(b.artist));
   const body=$("libraryBody");body.replaceChildren();
   for(const a of shown){
     const row=document.createElement("tr");
+    const selectCell=document.createElement("td"),check=document.createElement("input");check.type="checkbox";check.checked=selectedLibraryKeys.has(a.key);check.setAttribute("aria-label","Select "+a.artist+" — "+a.album);check.onchange=()=>{if(check.checked)selectedLibraryKeys.add(a.key);else selectedLibraryKeys.delete(a.key);updateLibraryActions()};selectCell.append(check);row.append(selectCell);
     const values=[a.artist,a.album,a.genre||"—",a.year||"—",(a.sources||[]).join(", ")+(a.suggestion_status?" · "+a.suggestion_status:""),(a.editions||[]).map(n=>"#"+n).join(", ")||"—"];
     for(const v of values){const td=document.createElement("td");td.textContent=v;row.append(td)}
     const info=document.createElement("td");
@@ -547,8 +551,28 @@ function renderLibrary(){
     };
     td.append(b);row.append(td);body.append(row);
   }
-  $("libraryStatus").textContent=shown.length+" displayed · "+libraryItems.length+" unique records. Published records appear first by default; later edition numbers may indicate drafts, not publication.";
+  libraryShownKeys=shown.map(a=>a.key);
+  updateLibraryActions();
+  $("libraryStatus").textContent=shown.length+" displayed · "+libraryItems.length+" unique records ("+hiddenLibraryKeys.size+" removed from library). Removal never deletes published editions or member suggestions.";
 }
+let libraryShownKeys=[];
+function updateLibraryActions(){
+  const hidden=$("libraryFilter").value==="hidden",selected=[...selectedLibraryKeys].filter(k=>hiddenLibraryKeys.has(k)===hidden);
+  $("libraryRemove").hidden=hidden;$("libraryRestore").hidden=!hidden;
+  $("libraryRemove").disabled=hidden||selected.length===0;$("libraryRestore").disabled=!hidden||selected.length===0;
+  const all=libraryShownKeys.length>0&&libraryShownKeys.every(k=>selectedLibraryKeys.has(k));
+  $("librarySelectAll").checked=all;$("librarySelectAll").indeterminate=!all&&libraryShownKeys.some(k=>selectedLibraryKeys.has(k));
+}
+$("librarySelectAll").onchange=e=>{for(const key of libraryShownKeys){if(e.target.checked)selectedLibraryKeys.add(key);else selectedLibraryKeys.delete(key)}renderLibrary()};
+async function changeLibraryVisibility(restore){
+  const keys=[...selectedLibraryKeys].filter(k=>hiddenLibraryKeys.has(k)===restore);
+  if(!keys.length)return;
+  const verb=restore?"restore":"remove";
+  if(!confirm((restore?"Restore ":"Remove ")+keys.length+" selected record(s) "+(restore?"to":"from")+" the library view? Published editions, drafts and listener suggestions remain untouched."))return;
+  try{for(let i=0;i<keys.length;i+=100)await adminApi("/admin/library",restore?"PATCH":"DELETE",{keys:keys.slice(i,i+100)});await refreshLibrary();$("libraryStatus").textContent=keys.length+" record(s) "+(restore?"restored":"removed from library")+". Original records preserved."}catch(e){$("libraryStatus").textContent="Could not "+verb+" records: "+e.message;await refreshLibrary()}
+}
+$("libraryRemove").onclick=()=>changeLibraryVisibility(false);
+$("libraryRestore").onclick=()=>changeLibraryVisibility(true);
 $("librarySearch").oninput=renderLibrary;$("libraryFilter").onchange=renderLibrary;$("librarySort").onchange=renderLibrary;
 $("libraryRefresh").onclick=refreshLibrary;
 $("libraryExport").onclick=()=>{
@@ -564,19 +588,36 @@ $("libraryAdd").onsubmit=async e=>{
   catch(err){$("libraryStatus").textContent="Could not add record: "+err.message}
 };
 
-async function refreshMembers(){
-  $("membersStatus").textContent="Loading members…";
+let memberActivity=[];
+function renderMembers(){
+  const filter=$("membersFilter").value,sort=$("membersSort").value;
+  const threshold=Date.now()-14*86400000;
+  const recent=m=>!!m.last_activity&&new Date(String(m.last_activity).replace(" ","T")+"Z").getTime()>=threshold;
+  const shown=memberActivity.filter(m=>filter==="recent"?recent(m):filter==="quiet"?!recent(m):filter==="none"?!m.last_activity:true);
+  shown.sort((a,b)=>sort==="name"?a.display_name.localeCompare(b.display_name):sort==="ratings"?b.rated-a.rated:(b.last_activity||"").localeCompare(a.last_activity||""));
   $("membersList").replaceChildren();
-  try{
-    const data=await adminApi("/admin/members");
-    const names=Array.isArray(data.members)?data.members:[];
-    $("membersStatus").textContent=names.length+" registered member"+(names.length===1?"":"s")+".";
-    for(const name of names){
-      const item=document.createElement("div");item.textContent=name;
-      $("membersList").append(item);
+  $("membersStatus").textContent=shown.length+" shown · "+memberActivity.length+" registered · "+memberActivity.filter(recent).length+" active in the past 14 days (recorded actions only).";
+  for(const m of shown){
+    const card=document.createElement("details");card.style.borderBottom="1px solid var(--line)";card.style.padding="9px 0";
+    const summary=document.createElement("summary");summary.style.cursor="pointer";
+    summary.textContent=m.display_name+" · "+m.rated+" rated · "+m.listened+" listened · "+m.want_to_listen+" planned · "+m.suggestions+" suggestions · "+(m.last_activity?"Last "+m.last_activity.slice(0,10):"No recorded activity");
+    card.append(summary);
+    const note=document.createElement("p");note.className="muted";note.textContent="Joined "+(m.joined_at||"").slice(0,10)+". Activity counts reflect saved actions, not page visits.";card.append(note);
+    if(m.ratings.length){
+      const table=document.createElement("table");table.style.width="100%";
+      const header=document.createElement("tr");for(const h of ["Album","Score","Updated"]){const th=document.createElement("th");th.textContent=h;th.style.textAlign="left";header.append(th)}table.append(header);
+      for(const rating of m.ratings){const tr=document.createElement("tr");for(const v of [rating.album,Number(rating.score).toFixed(1)+"/10",(rating.updated_at||"").slice(0,10)]){const td=document.createElement("td");td.textContent=v;td.style.padding="5px 8px 5px 0";tr.append(td)}table.append(tr)}
+      card.append(table);
     }
-  }catch(e){$("membersStatus").textContent="Could not load members: "+e.message}
+    $("membersList").append(card);
+  }
 }
+async function refreshMembers(){
+  $("membersStatus").textContent="Loading members…";$("membersList").replaceChildren();
+  try{const data=await adminApi("/admin/members");memberActivity=Array.isArray(data.members)?data.members:[];renderMembers()}
+  catch(e){$("membersStatus").textContent="Could not load members: "+e.message}
+}
+$("membersFilter").onchange=renderMembers;$("membersSort").onchange=renderMembers;
 
 function validatePreview(d){
  const issues=[];
