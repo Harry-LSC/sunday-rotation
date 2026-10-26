@@ -292,6 +292,12 @@ async function fetchAlbum(type,i){
       requests.push(fetch("https://itunes.apple.com/lookup?id=1518054890&country=US")
         .then(r=>r.ok?r.json():null).catch(()=>null));
     }
+    // Apple's search endpoint can omit canonical full-length releases even when lookup finds them.
+    // Robyn's complete Body Talk (2010), distinct from Body Talk Pt. 1/2/3.
+    if(artist==="robyn"&&wanted==="bodytalk"){
+      requests.push(fetch("https://itunes.apple.com/lookup?id=1440714879&country=US")
+        .then(r=>r.ok?r.json():null).catch(()=>null));
+    }
     const responses=await Promise.all(requests);
     for(const data of responses)for(const item of data?.results||[])
       if(item.collectionId&&item.wrapperType==="collection")results.set(item.collectionId,item);
