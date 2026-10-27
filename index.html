@@ -459,7 +459,9 @@ function shelfIsActive(){return document.querySelectorAll("main > section")[5]?.
 function ensureFirstShelfEdition(){
  // Edition 1 artwork and metadata are bundled with the page. Show them immediately
  // from the first archived Sunday, even while the authenticated API is loading.
- const berlinToday=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const datePart=type=>parts.find(p=>p.type===type)?.value||"";
+ const berlinToday=datePart("year")+"-"+datePart("month")+"-"+datePart("day");
  if(berlinToday>="2026-10-25"&&!shelfEditions.has(1))
   shelfEditions.set(1,{date:"18–24 October 2026",albums:editionOneAlbums});
 }
