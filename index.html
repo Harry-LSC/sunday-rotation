@@ -154,7 +154,7 @@ const $=s=>document.querySelector(s);const escapeHTML=s=>String(s).replace(/[&<>
 function cleanReview(r,id){if(!r||typeof r!=='object'||typeof r.score!=='number'||r.score<0||r.score>10||r.score*2%1)throw Error('Invalid score');const a=albums.find(a=>a.id===id)||albumHistory.get(id);if(!a)throw Error('Unknown album');return {score:r.score,moods:Array.isArray(r.moods)?[...new Set(r.moods.filter(x=>moodOptions.includes(x)))].slice(0,3):[],highlights:Array.isArray(r.highlights)?[...new Set(r.highlights.filter(x=>highlightOptions.includes(x)))].slice(0,2):[],again:['Yes','Maybe','No'].includes(r.again)?r.again:'',favourite:typeof r.favourite==='string'?r.favourite.trim().slice(0,200):'',note:typeof r.note==='string'?r.note.slice(0,160):''}}
 const moodOptions=['Uplifted','Reflective','Calm','Melancholy','Restless','Energized','Curious','Comforted','Unsettled','Nostalgic','Hopeful'];const highlightOptions=['Vocals','Lyrics','Rhythm','Guitar','Atmosphere','Melodies','Production','Bass','Percussion','Texture','Dynamics'];
 try{const raw=JSON.parse(localStorage.getItem(key)||'{}');for(const [id,r] of Object.entries(raw)){try{reviews[id]=cleanReview(r,id)}catch{}}}catch{storageOK=false}
-function go(n){sections.forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('nav button').forEach((b,i)=>{b.classList.toggle('active',i===n);if(i===n)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(n===1)renderShelf();if(n===4)renderJournal();if(n===5){shelfNotesOpen=false;if(account){ensureFirstShelfEdition();renderArchiveShelf();loadArchiveShelf()}else renderArchiveShelf()}window.scrollTo(0,0)}
+function go(n){sections.forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('nav button').forEach((b,i)=>{b.classList.toggle('active',i===n);if(i===n)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(n===1)renderShelf();if(n===4)renderJournal();if(n===5){shelfNotesOpen=false;if(account){const body=document.getElementById("archiveBody");if(body)body.hidden=false;ensureFirstShelfEdition();renderArchiveShelf();loadArchiveShelf()}else renderArchiveShelf()}window.scrollTo(0,0)}
 $('#nav').innerHTML=labels.map((s,i)=>`<button onclick="go(${i})">${s}</button>`).join('');
 function cover(a){return `<img src="${a.cover}" alt="${escapeHTML(a.title)} — ${escapeHTML(a.artist)} album cover" width="600" height="600">`}
 $('#heroCollage').innerHTML=albums.map((a,i)=>`<button type="button" class="collage-cover collage-${i}" onclick="select(${i})" aria-label="Explore ${escapeHTML(a.artist)} — ${escapeHTML(a.title)}">${cover(a)}</button>`).join('');
@@ -258,6 +258,12 @@ function showAccount(){
     ?'<span class="identity-name">Listening as <strong>'+escapeHTML(account.display_name)+'</strong></span><span class="identity-id">ID '+escapeHTML(account.listener_id)+'</span><button type="button" id="profileRecovery">Recovery key ↗</button>'
     :'<span class="identity-name">Just browsing</span><button type="button" id="profileJoin">Join the club ↗</button>';
   const join=el("profileJoin");if(join)join.onclick=()=>gate(true);
+  // Authentication can complete after a member has opened The Shelf.
+  // Reconcile the visible panel immediately, independently of archive network requests.
+  if(document.getElementById("archiveBody")?.closest("section")?.classList.contains("active")){
+    if(account){const body=document.getElementById("archiveBody");body.hidden=false}
+    renderArchiveShelf();
+  }
   const recovery=el("profileRecovery");if(recovery)recovery.onclick=()=>{
     if(!token)return;
     if(confirm("Your private recovery key grants access to your full journal. Copy it to a safe place?")) navigator.clipboard.writeText(token).then(()=>alert("Recovery key copied. Store it privately."),()=>prompt("Copy your recovery key:",token));
@@ -455,7 +461,7 @@ function browseEdition(n){
 
 const shelfEditions=new Map();
 let shelfRequest=null,shelfRequestToken=null,shelfLoadedAt=0,shelfFailureCount=0,shelfRetryTimer=null,shelfNotesOpen=false;
-function shelfIsActive(){return document.querySelectorAll("main > section")[5]?.classList.contains("active")}
+function shelfIsActive(){return !!document.getElementById("archiveBody")?.closest("section")?.classList.contains("active")}
 function ensureFirstShelfEdition(){
  // Edition 1 artwork and metadata are bundled with the page. Show them immediately
  // from the first archived Sunday, even while the authenticated API is loading.
