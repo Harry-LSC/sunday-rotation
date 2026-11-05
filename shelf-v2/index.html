@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>The Shelf V2 — Sunday Rotation test</title>
+<title>The Shelf — Sunday Rotation</title>
 <style>
 :root{--ink:#252a27;--red:#a74335;--paper:#f7f3ed;--border:#d7d0c4;--muted:#65665f}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Arial,sans-serif}
@@ -39,10 +39,9 @@ footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:
 <body>
 <header><a href="../">SUNDAY ROTATION</a><small>A weekly music club for curious ears</small></header>
 <main>
-<div class="eyebrow">THE ARCHIVE · V2 TEST</div>
+<div class="eyebrow">THE ARCHIVE</div>
 <h1>The Shelf</h1>
 <p class="lead">Every record we've featured. A growing collection of discoveries.</p>
-<p class="fine">Test version — the existing Shelf on the main site is unchanged.</p>
 <div id="status" class="notice" role="status" aria-live="polite">Checking your membership…</div>
 <section id="gate" hidden>
 <h2>Members' archive</h2>
@@ -60,7 +59,7 @@ footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:
 <div id="records" class="grid"></div>
 </section>
 <section id="detail" hidden><button id="back" type="button">← Back to The Shelf</button><div id="detailBody"></div></section>
-</main><footer>Sunday Rotation · Test version of The Shelf · No changes to member journals or ratings</footer>
+</main><footer>Sunday Rotation · A small club for wide-open ears.</footer>
 <script>
 "use strict";
 (function(){
@@ -106,7 +105,7 @@ for(const row of remote.editions){if(!row?.edition||!Array.isArray(row.edition.a
 const records=[...row.edition.albums];if(row.edition.limelight)records.push({...row.edition.limelight,isLimelight:true});
 incoming.push(validateEdition({number:Number(row.edition_number),starts_on:row.starts_on,albums:records}))}
 const dedupe=new Map();for(const e of incoming)if(olderThanCurrent(e.starts_on,berlinDay()))dedupe.set(e.number,e);
-editions=[...dedupe.values()];saveCache();lastCheck=Date.now();lastDay=berlinDay();render();info("Archive up to date · "+listRecords().length+" records across "+editions.length+" editions.");
+editions=[...dedupe.values()];saveCache();lastCheck=Date.now();lastDay=berlinDay();render();info("");
 fetchArtwork().catch(()=>{});
 }catch(e){console.warn("Shelf V2 refresh failed",e);info("Archive refresh failed: "+e.message+". "+(editions.length?"Showing your saved archive.":"Please try again."),true);render()}
 finally{pending=null}})();return pending}
