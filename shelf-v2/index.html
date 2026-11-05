@@ -19,11 +19,14 @@ h1{font:clamp(46px,8vw,76px)/1.03 Georgia,serif;margin:10px 0 15px}h2{font:28px 
 .toolbar input{flex:2 1 240px;min-width:160px}.toolbar select{flex:1 1 160px;min-width:140px}
 button{cursor:pointer}button:hover,button:focus-visible{border-color:var(--red)}button.primary{background:var(--ink);color:#fff}
 button:disabled{opacity:.5;cursor:default}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,215px),1fr));gap:22px;margin-top:20px}
-.card{background:#fff;border:1px solid var(--border);padding:14px;display:flex;flex-direction:column}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px;margin-top:20px}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.toolbar input{flex-basis:100%;min-width:0}.toolbar select{flex:1 1 130px;min-width:0}}
+@media(max-width:410px){.grid{gap:11px}.card{padding:10px;font-size:13px}.card h3{font-size:19px}.card .hook{font-size:12px}}
+.card{background:#fff;border:1px solid var(--border);padding:12px;min-width:0;display:flex;flex-direction:column}
 .art{width:100%;aspect-ratio:1/1;object-fit:cover;background:#ded9cc;display:block}
 .placeholder{height:auto;aspect-ratio:1/1;background:#d7d1c3;display:grid;place-items:center;text-align:center;font:22px Georgia,serif;padding:14px}
-.card h3{font:23px/1.13 Georgia,serif;margin:10px 0 3px}.card p{margin:4px 0}.card .meta{font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.04em}
+.card h3{font:21px/1.13 Georgia,serif;margin:10px 0 3px;overflow-wrap:anywhere}.card p{margin:4px 0}.card .meta{font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.04em}
 .card .hook{font-size:14px;color:var(--muted);flex:1;margin:10px 0}
 .card button{margin-top:15px;align-self:flex-start}
 #detail{max-width:800px}.detail-art{width:min(100%,330px);aspect-ratio:1/1;object-fit:cover;background:#ddd}
@@ -52,7 +55,7 @@ footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:
 <input type="search" id="search" placeholder="Search artist, album or genre…" aria-label="Search The Shelf">
 <select id="genre" aria-label="Genre"><option value="">All genres</option></select>
 <select id="sort" aria-label="Sort"><option value="recent">Recently added</option><option value="artist">Artist A–Z</option><option value="title">Album A–Z</option><option value="year-desc">Year: newest first</option><option value="year-asc">Year: oldest first</option></select>
-<button id="retry" type="button">Refresh archive</button>
+
 </div>
 <div id="records" class="grid"></div>
 </section>
@@ -109,7 +112,7 @@ fetchArtwork().catch(()=>{});
 finally{pending=null}})();return pending}
 async function fetchArtwork(){const ids=listRecords().filter(a=>!a.cover&&!artCache.has(a.id)&&/^\d+$/.test(a.id)).map(a=>a.id);if(!ids.length)return;try{const res=await fetch("https://itunes.apple.com/lookup?id="+[...new Set(ids)].join(",")+"&country=us",{cache:"force-cache"});if(!res.ok)return;const payload=await res.json();for(const a of payload.results||[])if(a.collectionId&&a.artworkUrl100)artCache.set(String(a.collectionId),a.artworkUrl100.replace("100x100bb","600x600bb"));if(!selected)render()}catch(e){console.warn("Artwork lookup unavailable",e)}}
 $("loginForm").onsubmit=async e=>{e.preventDefault();const key=$("key").value.trim().toLowerCase();if(!/^[0-9a-f]{64}$/.test(key)){info("Recovery key must contain 64 hexadecimal characters.",true);return}try{info("Checking membership…");await authenticate(key);$("key").value=""}catch(err){info("Could not sign in: "+err.message,true)}};
-$("search").oninput=render;$("genre").onchange=render;$("sort").onchange=render;$("retry").onclick=()=>refresh();$("back").onclick=showArchive;
+$("search").oninput=render;$("genre").onchange=render;$("sort").onchange=render;$("back").onclick=showArchive;
 window.addEventListener("pageshow",()=>{if(member){$("archive").hidden=!!selected;$("detail").hidden=!selected;render();if(Date.now()-lastCheck>60000||berlinDay()!==lastDay)refresh()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&member&&(Date.now()-lastCheck>60000||berlinDay()!==lastDay))refresh()});
 setInterval(()=>{if(!document.hidden&&member&&(Date.now()-lastCheck>300000||berlinDay()!==lastDay))refresh()},60000);
