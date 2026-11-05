@@ -15,10 +15,10 @@ header{background:var(--paper);border-bottom:1px solid var(--border);padding:16p
 .masthead .tagline{font-size:13px;color:#52606b;line-height:1.35;margin-top:4px}
 .member-strip{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;font-size:12px;line-height:1.35;max-width:44%}
 .member-strip strong{font-weight:700}.member-strip .identity-id{color:#65706a;font-variant-numeric:tabular-nums}
-.member-strip button{padding:0;border:0;background:transparent;color:#265a48;text-decoration:underline;font-size:12px;min-height:23px}
+.member-strip button{padding:0;border:0;background:transparent;color:#bc3926;text-decoration:underline;font-size:12px;min-height:23px}
 #siteNav{display:flex;gap:9px;padding:12px 5vw;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;white-space:nowrap;background:var(--paper)}
 #siteNav a{font:13px/1.4 system-ui,-apple-system,Arial,sans-serif;padding:9px 13px;text-decoration:none;color:#606676;border:1px solid var(--border);border-radius:24px}
-#siteNav a:hover,#siteNav a.active{color:white;background:#265a48;border-color:#265a48}
+#siteNav a:hover,#siteNav a.active{color:#fff;background:#bc3926;border-color:#bc3926}
 @media(max-width:600px){header{gap:8px}.masthead strong{font-size:clamp(18px,5.5vw,23px)}.masthead .brand-mark{width:19px;height:19px}.masthead .tagline{font-size:10px}.member-strip{font-size:10px;max-width:43%}.member-strip button{font-size:10px}#siteNav{gap:7px;padding:10px 5vw}#siteNav a{padding:9px 12px;font-size:12px;min-height:40px}}
 main{max-width:1200px;margin:0 auto;padding:36px max(5vw,20px) 90px}
 .eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:12px;font-weight:bold;color:var(--red)}
@@ -39,8 +39,26 @@ button:disabled{opacity:.5;cursor:default}
 .card h3{font:21px/1.13 Georgia,serif;margin:10px 0 3px;overflow-wrap:anywhere}.card p{margin:4px 0}.card .meta{font-size:12px;color:var(--red);text-transform:uppercase;letter-spacing:.04em}
 .card .hook{font-size:14px;color:var(--muted);flex:1;margin:10px 0}
 .card button{margin-top:15px;align-self:flex-start}
-#detail{max-width:800px}.detail-art{width:min(100%,330px);aspect-ratio:1/1;object-fit:cover;background:#ddd}
-#detail p{line-height:1.7}#detail .section-title{font-weight:bold;margin-top:22px}
+#detail{max-width:none}
+#detail .sleeve-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:45px;align-items:center;margin-top:22px}
+#detail .sleeve-artwork{width:100%;max-width:500px}
+#detail .sleeve-artwork .art,#detail .sleeve-artwork .placeholder{width:100%;aspect-ratio:1/1}
+#detail .sleeve-artwork img{width:100%;aspect-ratio:1/1;object-fit:cover}
+#detail .sleeve-meta{font-size:14px;color:var(--muted);letter-spacing:.02em}
+#detail .sleeve-artist{font-size:18px;color:var(--muted);margin:5px 0 18px}
+#detail .sleeve-hook{font:26px/1.2 Georgia,serif;margin:16px 0}
+#detail .sleeve-description{font-size:16px;line-height:1.65}
+#detail .stream-links{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 0}
+#detail .stream-link{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);padding:10px 12px;text-decoration:none;color:var(--ink);min-height:48px;font-size:12px;background:transparent}
+#detail .stream-link svg{width:23px;height:23px;flex:none}
+#detail .stream-link:hover{background:#ede9e1}
+#detail .stream-caption{font-size:12px;color:var(--muted);margin-top:10px}
+#detail .sleeve-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:25px;margin-top:40px}
+#detail .sleeve-notes h3{font:24px/1.2 Georgia,serif;margin:0 0 12px}
+#detail .sleeve-notes p{margin-top:0;line-height:1.7}
+#detail .sleeve-credit{border-top:1px solid var(--border);margin-top:55px;padding-top:16px;font-size:12px;color:var(--muted)}
+@media(max-width:800px){#detail .sleeve-layout{grid-template-columns:1fr;gap:20px}#detail .sleeve-notes{grid-template-columns:1fr;gap:18px;margin-top:32px}}
+@media(max-width:420px){#detail .stream-link{width:calc(50% - 5px)}}
 #loginForm{display:flex;gap:10px;flex-wrap:wrap}#loginForm input{flex:1;min-width:180px}
 [hidden]{display:none!important}
 footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:var(--muted)}
@@ -117,7 +135,39 @@ else if(sort==="year-asc")matches.sort((a,b)=>(a.year||0)-(b.year||0));
 $("count").textContent=matches.length+" of "+all.length+" records in The Shelf · "+new Set(all.map(a=>a.editionNumber)).size+" archived editions";
 const grid=$("records");grid.replaceChildren();if(!all.length){grid.append(text("p","There are no archived editions available yet."));return}if(!matches.length){grid.append(text("p","No records match these filters."));return}
 for(const a of matches){const card=text("article","","card");setArtwork(card,a);card.append(text("p",a.genre+" · "+(a.year||"")+(a.limelight?" · IN THE LIMELIGHT":""),"meta"),text("h3",a.title),text("p",a.artist),text("p",a.hook,"hook"));const btn=text("button","Explore the record ↗");btn.type="button";btn.onclick=()=>openDetails(a);card.append(btn);grid.append(card)}}
-function openDetails(a){selected=a;$("archive").hidden=true;$("detail").hidden=false;const body=$("detailBody");body.replaceChildren();const cover=text("div");setArtwork(cover,a);const pic=cover.firstChild;if(pic?.tagName==="IMG")pic.className="detail-art";body.append(cover,text("p","Edition "+a.editionNumber+" · "+a.genre+" · "+(a.year||""),"eyebrow"),text("h2",a.title),text("p",a.artist),text("p",a.desc));for(const [label,value] of [["Listen when",a.when],["Listen for",a.listenFor],["Why it's here",a.why]])if(value){body.append(text("p",label,"section-title"),text("p",value))}if(a.source.startsWith("https://")){const link=document.createElement("a");link.href=a.source;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Listen on Apple Music ↗";body.append(link)}window.scrollTo(0,0)}
+function renderItalicNotes(holder,value){
+ const pieces=String(value||"").split(/(\*[^*\n]+\*)/g);
+ for(const piece of pieces){if(piece.startsWith("*")&&piece.endsWith("*")&&piece.length>2){const italic=document.createElement("em");italic.textContent=piece.slice(1,-1);holder.append(italic)}else holder.append(document.createTextNode(piece))}
+}
+function openDetails(a){
+ selected=a;$("archive").hidden=true;$("detail").hidden=false;
+ const body=$("detailBody");body.replaceChildren();
+ body.append(text("p","From Edition "+String(a.editionNumber).padStart(2,"0"),"fine"));
+ const split=text("div","","sleeve-layout");
+ const cover=text("div","","sleeve-artwork");setArtwork(cover,a);
+ const prose=text("div");
+ prose.append(text("p",a.genre+" · "+(a.year||"")+(a.minutes?" · approximately "+a.minutes+" minutes":""),"sleeve-meta"),text("h2",a.title),text("p",a.artist,"sleeve-artist"),text("h3",a.hook,"sleeve-hook"),text("p",a.desc,"sleeve-description"));
+ const links=text("div","","stream-links");const q=encodeURIComponent(a.artist+" "+a.title);
+ const services=[
+  ["Spotify","https://open.spotify.com/search/"+q,'<circle cx="12" cy="12" r="11" fill="#1DB954"/><path d="M5.5 9c4.8-1.4 9.8-.8 13.5 1M6 12.6c4-1.1 8.7-.5 12 1M7 16c3.3-.8 6.9-.3 9.6 1" fill="none" stroke="#111" stroke-width="1.8" stroke-linecap="round"/>'],
+  ["Apple Music",a.source.startsWith("https://")?a.source:"https://music.apple.com/us/search?term="+q,'<path fill="currentColor" d="M17 3v13a4 4 0 1 1-2-3.46V7.3l-7 1.5V18a4 4 0 1 1-2-3.46V6.9a1 1 0 0 1 .8-1L17 3z"/>'],
+  ["YouTube","https://www.youtube.com/results?search_query="+q,'<rect x="1" y="4" width="22" height="16" rx="5" fill="#FF0033"/><path d="m10 8 6 4-6 4z" fill="white"/>'],
+  ["TIDAL","https://tidal.com/search?q="+q,'<path fill="currentColor" d="M4 5 8 9 4 13 0 9zm8 0 4 4-4 4-4-4zm8 8 4 4-4 4-4-4zm8-8 4 4-4 4-4-4z"/>']
+ ];
+ for(const [name,url,art] of services){
+  const link=document.createElement("a");link.className="stream-link";link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.setAttribute("aria-label",name+" — "+a.artist+" — "+a.title);
+  const icon=document.createElementNS("http://www.w3.org/2000/svg","svg");icon.setAttribute("viewBox","0 0 24 24");icon.setAttribute("aria-hidden","true");icon.innerHTML=art;
+  link.append(icon,text("span",name));links.append(link);
+ }
+ prose.append(links,text("p","Apple Music opens the matched album. Other services open searches. Availability depends on your location and account.","stream-caption"));
+ split.append(cover,prose);body.append(split);
+ const notes=text("div","","sleeve-notes");
+ for(const [label,value] of [["Listen when",a.when],["Listen for",a.listenFor],["Why it’s here",a.why]]){
+  const block=text("div");block.append(text("h3",label));const p=text("p");renderItalicNotes(p,value);block.append(p);notes.append(block)
+ }
+ body.append(notes,text("p","Album details and artwork: Apple Music / iTunes catalogue. Listening notes are Sunday Rotation editorial impressions.","sleeve-credit"));
+ window.scrollTo(0,0)
+}
 async function refresh(){
 if(!member||pending)return pending;
 const key=credential;info("Checking the published archive…");
