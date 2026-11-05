@@ -156,6 +156,8 @@ const moodOptions=['Uplifted','Reflective','Calm','Melancholy','Restless','Energ
 try{const raw=JSON.parse(localStorage.getItem(key)||'{}');for(const [id,r] of Object.entries(raw)){try{reviews[id]=cleanReview(r,id)}catch{}}}catch{storageOK=false}
 function go(n){if(n===5){window.location.assign('./shelf-v2/');return}sections.forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('nav button').forEach((b,i)=>{b.classList.toggle('active',i===n);if(i===n)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(n===1)renderShelf();if(n===4)renderJournal();if(n===5){shelfNotesOpen=false;openShelfSafely()}window.scrollTo(0,0)}
 $('#nav').innerHTML=labels.map((s,i)=>`<button onclick="go(${i})">${s}</button>`).join('');
+// Allow Shelf's shared navigation to land on the requested main-site tab.
+window.addEventListener("load",()=>{const raw=new URLSearchParams(window.location.search).get("tab");if(raw!==null&&/^[0-6]$/.test(raw)){const tab=Number(raw);if(tab!==5)go(tab)}});
 function cover(a){return `<img src="${a.cover}" alt="${escapeHTML(a.title)} — ${escapeHTML(a.artist)} album cover" width="600" height="600">`}
 $('#heroCollage').innerHTML=albums.map((a,i)=>`<button type="button" class="collage-cover collage-${i}" onclick="select(${i})" aria-label="Explore ${escapeHTML(a.artist)} — ${escapeHTML(a.title)}">${cover(a)}</button>`).join('');
 function limelightBadge(){const label=document.createElement("span");label.className="sr-limelight-badge";label.textContent="IN THE LIMELIGHT";return label}
