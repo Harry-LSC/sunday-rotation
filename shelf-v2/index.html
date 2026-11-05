@@ -57,6 +57,24 @@ button:disabled{opacity:.5;cursor:default}
 #detail .sleeve-notes h3{font:24px/1.2 Georgia,serif;margin:0 0 12px}
 #detail .sleeve-notes p{margin-top:0;line-height:1.7}
 #detail .sleeve-credit{border-top:1px solid var(--border);margin-top:55px;padding-top:16px;font-size:12px;color:var(--muted)}
+#detail .review-panel{border-top:1px solid var(--border);margin-top:36px;padding-top:28px;max-width:770px}
+#detail .review-panel h3{font:32px/1.2 Georgia,serif;margin:12px 0}
+#detail .review-panel fieldset{border:0;margin:18px 0;padding:0}
+#detail .review-panel legend{font-weight:650;margin:0 0 9px}
+#detail .review-panel .chips{display:flex;flex-wrap:wrap;gap:7px}
+#detail .review-panel .chips button{padding:8px 13px;border-radius:24px;font-size:13px}
+#detail .review-panel .chips button.active{background:#bc3926;color:#fff;border-color:#bc3926}
+#detail .review-panel label{display:block;font-weight:600;margin:15px 0 7px}
+#detail .review-panel input[type="range"]{width:100%;accent-color:#bc3926}
+#detail .review-panel select,#detail .review-panel textarea{max-width:100%;width:100%;background:#fff}
+#detail .review-panel textarea{min-height:76px;resize:vertical}
+#detail .review-panel .review-score{font:40px/1.2 Georgia,serif;display:block}
+#detail .review-panel .review-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;align-items:center}
+#detail .review-panel .review-save{background:#bc3926;border-color:#bc3926;color:white}
+#detail .review-panel .review-delete{color:#9d3528}
+#detail .review-panel .review-message{margin:15px 0;font-size:14px}
+#detail .review-panel .club-rating{color:var(--muted);font-size:13px;margin:12px 0}
+
 @media(max-width:800px){#detail .sleeve-layout{grid-template-columns:1fr;gap:20px}#detail .sleeve-notes{grid-template-columns:1fr;gap:18px;margin-top:32px}}
 @media(max-width:420px){#detail .stream-link{width:calc(50% - 5px)}}
 #loginForm{display:flex;gap:10px;flex-wrap:wrap}#loginForm input{flex:1;min-width:180px}
@@ -97,7 +115,7 @@ footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:
 const API="https://sunday-rotation-api.linealsportchamp.workers.dev";
 const MEMBER_KEY="sunday-rotation-member-v1", CACHE_PREFIX="sr-shelf-v2:";
 const $=id=>document.getElementById(id);
-let credential=null, member=null, editions=[], pending=null, lastCheck=0, lastDay="", editionOne=null, artCache=new Map(), selected=null;
+let credential=null, member=null, editions=[], pending=null, lastCheck=0, lastDay="", editionOne=null, artCache=new Map(), selected=null, journalReviews=new Map(), journalLoaded=false;
 const berlinDay=()=>{const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const p=k=>parts.find(x=>x.type===k)?.value||"";return p("year")+"-"+p("month")+"-"+p("day")};
 const olderThanCurrent=(date,today)=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return false;const end=new Date(date+"T12:00:00Z");end.setUTCDate(end.getUTCDate()+7);return end.toISOString().slice(0,10)<=today};
 function info(message,problem=false){$("status").textContent=message;$("status").style.borderLeftColor=problem?"#a74335":"#64715d"}
@@ -165,8 +183,129 @@ function openDetails(a){
  for(const [label,value] of [["Listen when",a.when],["Listen for",a.listenFor],["Why it’s here",a.why]]){
   const block=text("div");block.append(text("h3",label));const p=text("p");renderItalicNotes(p,value);block.append(p);notes.append(block)
  }
- body.append(notes,text("p","Album details and artwork: Apple Music / iTunes catalogue. Listening notes are Sunday Rotation editorial impressions.","sleeve-credit"));
+ body.append(notes);
+ const leave=text("button","Leave your impression ↗","primary");leave.type="button";leave.style.marginTop="24px";leave.onclick=()=>showReviewForm(a);body.append(leave);
+ const reviewSpace=text("div","","review-panel");reviewSpace.id="archivedReview";reviewSpace.hidden=true;body.append(reviewSpace);
+ body.append(text("p","Album details and artwork: Apple Music / iTunes catalogue. Listening notes are Sunday Rotation editorial impressions.","sleeve-credit"));
  window.scrollTo(0,0)
+}
+
+const reviewMoods=["Uplifted","Reflective","Calm","Melancholy","Restless","Energized","Curious","Comforted","Unsettled","Nostalgic","Hopeful"];
+const reviewHighlights=["Vocals","Lyrics","Rhythm","Guitar","Atmosphere","Melodies","Production","Bass","Percussion","Texture","Dynamics"];
+async function journalRequest(method="GET",payload=null,path="/journal"){
+ const options={method,cache:"no-store",headers:{Authorization:"Bearer "+credential}};
+ if(payload!==null){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(payload)}
+ const result=await fetch(API+path,options);
+ const body=await result.json().catch(()=>({}));
+ if(!result.ok)throw Error(body.error||"Journal server error "+result.status);
+ return body;
+}
+async function loadJournal(){
+ const data=await journalRequest();
+ const next=new Map();
+ for(const entry of data.entries||[])if(entry.status==="rated"&&entry.score!=null)next.set(String(entry.album_id),entry);
+ journalReviews=next;journalLoaded=true;
+}
+function decodeReview(entry){
+ if(!entry)return null;
+ let extra={};try{extra=JSON.parse(entry.notes||"{}")||{}}catch{}
+ return {score:Number(entry.score),moods:Array.isArray(extra.moods)?extra.moods:[],highlights:Array.isArray(extra.highlights)?extra.highlights:[],again:String(extra.again||""),favourite:String(extra.favourite||""),note:String(extra.note||"")};
+}
+function createChips(field,options,limit,checked){
+ const wrap=text("div","","chips");const fieldset=document.createElement("fieldset");
+ fieldset.append(text("legend",field+" · "+(limit===1?"optional":"choose up to "+limit)),wrap);
+ for(const option of options){
+  const btn=text("button",option,checked.includes(option)?"active":"");btn.type="button";btn.setAttribute("aria-pressed",String(checked.includes(option)));
+  btn.onclick=()=>{
+   const chosen=[...wrap.querySelectorAll(".active")];
+   if(btn.classList.contains("active")){btn.classList.remove("active");btn.setAttribute("aria-pressed","false")}
+   else if(chosen.length<limit){btn.classList.add("active");btn.setAttribute("aria-pressed","true")}
+   else if(limit===1){for(const other of chosen){other.classList.remove("active");other.setAttribute("aria-pressed","false")}btn.classList.add("active");btn.setAttribute("aria-pressed","true")}
+  };
+  wrap.append(btn);
+ }
+ return {fieldset,values:()=>[...wrap.querySelectorAll(".active")].map(x=>x.textContent)};
+}
+async function fillTracks(select,album,previous){
+ select.replaceChildren(new Option("Loading tracks…",""));
+ if(!/^[0-9]+$/.test(album.id)){select.replaceChildren(new Option("Track list unavailable",""));return}
+ try{
+  const result=await fetch("https://itunes.apple.com/lookup?id="+encodeURIComponent(album.id)+"&entity=song&limit=200",{cache:"force-cache"});
+  if(!result.ok)throw Error("Track lookup failed");
+  const data=await result.json();
+  const names=[...new Set((data.results||[]).filter(t=>t.wrapperType==="track"&&String(t.collectionId)===album.id&&t.trackName).sort((a,b)=>(a.trackNumber||0)-(b.trackNumber||0)).map(t=>t.trackName))];
+  if(previous&&!names.includes(previous))names.push(previous);
+  if(!select.isConnected)return;
+  select.replaceChildren(new Option("No favourite selected",""),...names.map(name=>new Option(name,name)));
+  select.value=previous||"";
+ }catch(err){
+  if(select.isConnected)select.replaceChildren(new Option("Tracks unavailable",""),...(previous?[new Option(previous,previous)]:[]));
+ }
+}
+async function showReviewForm(album){
+ const panel=$("archivedReview");if(!panel||!selected||String(selected.id)!==String(album.id))return;
+ panel.hidden=false;panel.replaceChildren(text("p","Loading your saved review…"));
+ panel.scrollIntoView({behavior:"smooth",block:"start"});
+ try{
+  await loadJournal();
+  if(!panel.isConnected||String(selected?.id)!==album.id)return;
+  const existing=decodeReview(journalReviews.get(album.id));
+  panel.replaceChildren(text("h3","Your take"),text("p",album.artist+" — "+album.title));
+  const form=document.createElement("form");
+  const scoreLabel=text("label","How much did you enjoy it?");
+  const number=text("output",existing?existing.score.toFixed(1):"—","review-score");
+  const score=document.createElement("input");score.type="range";score.min="0";score.max="10";score.step=".5";score.value=existing?String(existing.score):"7.5";
+  let chosenScore=!!existing;
+  score.oninput=()=>{chosenScore=true;number.textContent=Number(score.value).toFixed(1);save.disabled=false};
+  form.append(scoreLabel,number,score);
+  const moods=createChips("How did it leave you feeling?",reviewMoods,3,existing?.moods||[]);
+  const highlights=createChips("What stayed with you?",reviewHighlights,2,existing?.highlights||[]);
+  const repeat=createChips("Would you listen again?",["Yes","Maybe","No"],1,existing?.again?[existing.again]:[]);
+  form.append(moods.fieldset,highlights.fieldset,repeat.fieldset);
+  const trackLabel=text("label","A favourite track · optional");
+  const favourite=document.createElement("select");favourite.append(new Option("Loading tracks…",""));
+  form.append(trackLabel,favourite);
+  fillTracks(favourite,album,existing?.favourite||"");
+  const noteLabel=text("label","One thought · optional");
+  const note=document.createElement("textarea");note.maxLength=160;note.placeholder="A moment, a surprise, a reason to return…";note.value=existing?.note||"";
+  form.append(noteLabel,note);
+  const actions=text("div","","review-actions");
+  const save=text("button",existing?"Update my impression ↗":"Save my impression ↗","review-save");save.type="submit";save.disabled=!chosenScore;
+  const remove=text("button","Delete this review","review-delete");remove.type="button";remove.disabled=!existing;
+  actions.append(save,remove);form.append(actions);
+  const message=text("p",existing?"Your saved review is ready to edit.":"","review-message");
+  const club=text("p","","club-rating");
+  form.append(message,club);panel.append(form);
+  async function showClubScore(){
+   try{const data=await api("/club-score?album_id="+encodeURIComponent(album.id),credential);
+    if(data.available)club.textContent="Club average: "+Number(data.average).toFixed(1)+" / 10 · "+data.count+" rating"+(data.count===1?"":"s");
+    else club.textContent="Rate this album to reveal the club average."
+   }catch{club.textContent="Club score temporarily unavailable."}
+  }
+  showClubScore();
+  form.onsubmit=async ev=>{
+   ev.preventDefault();if(!chosenScore)return;
+   save.disabled=true;remove.disabled=true;message.textContent="Saving to your journal…";
+   try{
+    const selectedOptions={moods:moods.values(),highlights:highlights.values(),again:repeat.values()[0]||"",favourite:favourite.value,note:note.value};
+    const payload={album_id:album.id,status:"rated",score:Number(score.value),mood:selectedOptions.moods.join(", "),notes:JSON.stringify(selectedOptions)};
+    await journalRequest("PUT",payload);
+    journalReviews.set(album.id,{album_id:album.id,status:"rated",score:payload.score,notes:payload.notes});journalLoaded=true;
+    message.textContent="Saved to your private Sunday Rotation journal.";save.textContent="Update my impression ↗";remove.disabled=false;
+    showClubScore();
+   }catch(err){message.textContent="Not saved: "+err.message+". Try again."}
+   finally{save.disabled=false;remove.disabled=!journalReviews.has(album.id)}
+  };
+  remove.onclick=async()=>{
+   if(!journalReviews.has(album.id)||!confirm("Delete your review of “"+album.title+"”?"))return;
+   remove.disabled=true;save.disabled=true;message.textContent="Removing review…";
+   try{
+    await journalRequest("DELETE",null,"/journal?album_id="+encodeURIComponent(album.id));
+    journalReviews.delete(album.id);message.textContent="Review deleted from your journal.";
+    chosenScore=false;number.textContent="—";save.disabled=true;remove.disabled=true;club.textContent="Rate this album to reveal the club average.";
+   }catch(err){message.textContent="Could not delete review: "+err.message;remove.disabled=false;save.disabled=false}
+  };
+ }catch(err){panel.replaceChildren(text("p","Could not load your journal: "+err.message));const retry=text("button","Retry");retry.type="button";retry.onclick=()=>showReviewForm(album);panel.append(retry)}
 }
 async function refresh(){
 if(!member||pending)return pending;
