@@ -7,9 +7,19 @@
 <style>
 :root{--ink:#252a27;--red:#a74335;--paper:#f7f3ed;--border:#d7d0c4;--muted:#65665f}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Arial,sans-serif}
-header{background:#e9e7df;border-bottom:1px solid var(--border);padding:25px max(5vw,20px)}
-header a{color:var(--ink);text-decoration:none;font-family:Georgia,serif;font-size:clamp(23px,4vw,38px);font-weight:bold;letter-spacing:.05em}
-header small{display:block;letter-spacing:.14em;text-transform:uppercase;color:var(--red);font-size:11px}
+header{background:var(--paper);border-bottom:1px solid var(--border);padding:16px 5vw;display:flex;justify-content:space-between;align-items:center;gap:18px}
+.brand-home{color:var(--ink);text-decoration:none;display:block;min-width:0}
+.masthead{display:flex;flex-direction:column;align-items:flex-start;gap:0}
+.masthead strong{font:700 23px/1.2 system-ui,-apple-system,Arial,sans-serif;letter-spacing:-1px;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
+.masthead .brand-mark{width:25px;height:25px}
+.masthead .tagline{font-size:13px;color:#52606b;line-height:1.35;margin-top:4px}
+.member-strip{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;font-size:12px;line-height:1.35;max-width:44%}
+.member-strip strong{font-weight:700}.member-strip .identity-id{color:#65706a;font-variant-numeric:tabular-nums}
+.member-strip button{padding:0;border:0;background:transparent;color:#265a48;text-decoration:underline;font-size:12px;min-height:23px}
+#siteNav{display:flex;gap:9px;padding:12px 5vw;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;white-space:nowrap;background:var(--paper)}
+#siteNav a{font:13px/1.4 system-ui,-apple-system,Arial,sans-serif;padding:9px 13px;text-decoration:none;color:#606676;border:1px solid var(--border);border-radius:24px}
+#siteNav a:hover,#siteNav a.active{color:white;background:#265a48;border-color:#265a48}
+@media(max-width:600px){header{gap:8px}.masthead strong{font-size:clamp(18px,5.5vw,23px)}.masthead .brand-mark{width:19px;height:19px}.masthead .tagline{font-size:10px}.member-strip{font-size:10px;max-width:43%}.member-strip button{font-size:10px}#siteNav{gap:7px;padding:10px 5vw}#siteNav a{padding:9px 12px;font-size:12px;min-height:40px}}
 main{max-width:1200px;margin:0 auto;padding:36px max(5vw,20px) 90px}
 .eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:12px;font-weight:bold;color:var(--red)}
 h1{font:clamp(46px,8vw,76px)/1.03 Georgia,serif;margin:10px 0 15px}h2{font:28px Georgia,serif;margin:4px 0}
@@ -37,7 +47,10 @@ footer{border-top:1px solid var(--border);padding:22px 5vw;font-size:13px;color:
 </style>
 </head>
 <body>
-<header><a href="../">SUNDAY ROTATION</a><small>A weekly music club for curious ears</small></header>
+<header><a class="brand-home" href="../" aria-label="Sunday Rotation home"><div class="masthead"><strong>sunday rotation<svg class="brand-mark" width="27" height="27" viewBox="0 0 40 40" role="img" aria-label="Sunday Rotation starburst"><line x1="20" y1="20" x2="20.00" y2="5.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="30.61" y2="9.39" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="35.00" y2="20.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="30.61" y2="30.61" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="20.00" y2="35.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="9.39" y2="30.61" stroke="#242827" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="5.00" y2="20.00" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/><line x1="20" y1="20" x2="9.39" y2="9.39" stroke="#d85b37" stroke-width="1.65" stroke-linecap="round"/></svg></strong><span class="tagline">A weekly music club for curious ears.</span></div></a><div id="memberStrip" class="member-strip" aria-live="polite">Checking your membership…</div></header>
+<nav aria-label="Main navigation" id="siteNav">
+<a href="../?tab=0">The club</a><a href="../?tab=1">This week</a><a href="../?tab=2">Sleeve notes</a><a href="../?tab=3">Your take</a><a href="../?tab=4">Your journal</a><a class="active" aria-current="page" href="./">The Shelf</a><a href="../?tab=6">Contribute</a>
+</nav>
 <main>
 <div class="eyebrow">THE ARCHIVE</div>
 <h1>The Shelf</h1>
@@ -78,7 +91,20 @@ function restoreCache(){try{const value=JSON.parse(localStorage.getItem(cachedKe
 function saveCache(){try{localStorage.setItem(cachedKey(),JSON.stringify({format:2,saved_at:Date.now(),editions}))}catch(e){console.warn("Archive cache unavailable",e)}}
 async function api(path,key){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);try{const r=await fetch(API+path,{cache:"no-store",headers:key?{Authorization:"Bearer "+key}:{},signal:controller.signal});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||"HTTP "+r.status);return data}finally{clearTimeout(timer)}}
 async function getEditionOne(){if(editionOne)return editionOne;const r=await fetch("../admin/edition-one.json",{cache:"force-cache"});if(!r.ok)throw Error("Original edition catalogue is unavailable");const j=await r.json();if(!Array.isArray(j.albums)||j.albums.length!==10)throw Error("Original edition catalogue is incomplete");editionOne={number:1,starts_on:"2026-10-18",albums:j.albums.map(normal)};return editionOne}
-async function authenticate(key){const data=await api("/me",key);if(!data.listener?.listener_id)throw Error("Invalid recovery key");credential=key;member=data.listener;$("gate").hidden=true;$("archive").hidden=false;restoreCache();render();await refresh()}
+async function authenticate(key){const data=await api("/me",key);if(!data.listener?.listener_id)throw Error("Invalid recovery key");credential=key;member=data.listener;showIdentity();$("gate").hidden=true;$("archive").hidden=false;restoreCache();render();await refresh()}
+function showIdentity(){
+ const strip=$("memberStrip");strip.replaceChildren();
+ if(!member){strip.append(text("span","Just browsing"));return}
+ const name=text("span","Listening as ","identity-name");name.append(text("strong",member.display_name));
+ strip.append(name,text("span","ID "+member.listener_id,"identity-id"));
+ const btn=text("button","Recovery key ↗");btn.type="button";
+ btn.onclick=async()=>{
+  if(!credential||!confirm("Copy your private recovery key? Keep it somewhere safe."))return;
+  try{await navigator.clipboard.writeText(credential);info("Recovery key copied.");}
+  catch(e){prompt("Copy your recovery key:",credential)}
+ };
+ strip.append(btn);
+}
 function listRecords(){const today=berlinDay();const uniqueEditions=new Map();for(const e of editions){if(olderThanCurrent(e.starts_on,today))uniqueEditions.set(e.number,e)}return [...uniqueEditions.values()].sort((a,b)=>b.number-a.number).flatMap(e=>e.albums.map(a=>({...a,editionNumber:e.number})))}
 function showArchive(){selected=null;$("archive").hidden=false;$("detail").hidden=true;render()}
 function setArtwork(holder,a){const url=a.cover||artCache.get(a.id);if(url){const img=document.createElement("img");img.className="art";img.loading="lazy";img.alt=a.title+" — "+a.artist+" album artwork";img.src=url;img.onerror=()=>{img.replaceWith(text("div",a.title,"placeholder"))};holder.append(img)}else holder.append(text("div",a.title,"placeholder"))}
@@ -115,6 +141,6 @@ $("search").oninput=render;$("genre").onchange=render;$("sort").onchange=render;
 window.addEventListener("pageshow",()=>{if(member){$("archive").hidden=!!selected;$("detail").hidden=!selected;render();if(Date.now()-lastCheck>60000||berlinDay()!==lastDay)refresh()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&member&&(Date.now()-lastCheck>60000||berlinDay()!==lastDay))refresh()});
 setInterval(()=>{if(!document.hidden&&member&&(Date.now()-lastCheck>300000||berlinDay()!==lastDay))refresh()},60000);
-(async()=>{try{const saved=JSON.parse(localStorage.getItem(MEMBER_KEY)||"null");if(saved?.credential&&/^[0-9a-f]{64}$/i.test(saved.credential))await authenticate(saved.credential.toLowerCase());else{$("gate").hidden=false;info("Sign in to open the members-only archive.")}}catch(e){$("gate").hidden=false;info("Sign-in could not be restored: "+e.message+". Enter your recovery key to retry.",true)}})();
+(async()=>{try{const saved=JSON.parse(localStorage.getItem(MEMBER_KEY)||"null");if(saved?.credential&&/^[0-9a-f]{64}$/i.test(saved.credential))await authenticate(saved.credential.toLowerCase());else{$("gate").hidden=false;showIdentity();info("Sign in to open the members-only archive.")}}catch(e){$("gate").hidden=false;showIdentity();info("Sign-in could not be restored: "+e.message+". Enter your recovery key to retry.",true)}})();
 })();
 </script></body></html>
