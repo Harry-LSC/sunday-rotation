@@ -6,10 +6,13 @@ const reply = (x,status=200) => new Response(JSON.stringify(x),{status,headers:{
 const error = (message,status=400)=>reply({error:message},status);
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
 const sha=async text=>hex(new Uint8Array(await crypto.subtle.digest("SHA-256",encoder.encode(text))));
+// Edition drafts contain ten fully annotated albums. 16 KiB was too small,
+// particularly once the tenth record was filled. Guard request bytes at 100 KiB.
+const MAX_REQUEST_BYTES=100000;
 async function parse(request){
-  if(Number(request.headers.get("content-length")||0)>16384)throw Error("Request too large");
+  if(Number(request.headers.get("content-length")||0)>MAX_REQUEST_BYTES)throw Error("Request too large (maximum 100 KB)");
   const raw=await request.text();
-  if(raw.length>16384)throw Error("Request too large");
+  if(encoder.encode(raw).byteLength>MAX_REQUEST_BYTES)throw Error("Request too large (maximum 100 KB)");
   try{return JSON.parse(raw)}catch{throw Error("Invalid JSON")}
 }
 async function authenticated(request,db){
