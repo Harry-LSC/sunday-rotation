@@ -476,12 +476,12 @@ const compactRecord=record=>{
   const out={};
   for(const [key,value] of Object.entries(record)){
     if(key==="undefined"||value===null||value===""||value===false)continue;
-    if((key==="track_count"||key==="metadata_source")&&value==="Apple Music")continue;
+    // Preserve metadata_source and track_count for the editor after reload.
     out[key]=value;
   }
   return out;
 };
-const compactDraft={...draft,albums:draft.albums.map(compactRecord),limelight:draft.limelight?compactRecord(draft.limelight):null};
+const compactDraft={starts_on:draft.starts_on,albums:draft.albums.map(compactRecord),limelight:draft.limelight?compactRecord(draft.limelight):null};
 const payload={expected_version:draftVersion,draft:compactDraft};
 const bytes=new TextEncoder().encode(JSON.stringify(payload)).length;
 if(bytes>16384)throw Error("Draft is "+Math.ceil(bytes/1024)+" KB; the deployed Cloudflare Worker only accepts 16 KB. Download a backup before changing anything. The Worker needs its request limit increased.");
