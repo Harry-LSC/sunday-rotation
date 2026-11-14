@@ -469,7 +469,23 @@ $("save").onclick=async()=>{
   if(editionNumber()===null){$("status").textContent="Choose a valid Sunday.";return}
   const button=$("save");button.disabled=true;$("status").textContent="Saving to Cloudflare…";
   try{
-    const response=await adminApi("/admin/draft?starts_on="+encodeURIComponent($("start").value),"PUT",{expected_version:draftVersion,draft:getData()});
+    const draft=getData();
+// The deployed Worker still has a 16 KiB request limit. Omit empty/default
+// record fields: its scrubRecord() restores exactly those defaults on receipt.
+const compactRecord=record=>{
+  const out={};
+  for(const [key,value] of Object.entries(record)){
+    if(key==="undefined"||value===null||value===""||value===false)continue;
+    if((key==="track_count"||key==="metadata_source")&&value==="Apple Music")continue;
+    out[key]=value;
+  }
+  return out;
+};
+const compactDraft={...draft,albums:draft.albums.map(compactRecord),limelight:draft.limelight?compactRecord(draft.limelight):null};
+const payload={expected_version:draftVersion,draft:compactDraft};
+const bytes=new TextEncoder().encode(JSON.stringify(payload)).length;
+if(bytes>16384)throw Error("Draft is "+Math.ceil(bytes/1024)+" KB; the deployed Cloudflare Worker only accepts 16 KB. Download a backup before changing anything. The Worker needs its request limit increased.");
+const response=await adminApi("/admin/draft?starts_on="+encodeURIComponent($("start").value),"PUT",payload);
     draftVersion=response.version;$("status").textContent="Saved to Cloudflare · version "+draftVersion+".";
   }catch(e){$("status").textContent="Not saved: "+e.message}
   finally{button.disabled=false}
