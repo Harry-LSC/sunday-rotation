@@ -484,7 +484,7 @@ const compactRecord=record=>{
 const compactDraft={starts_on:draft.starts_on,albums:draft.albums.map(compactRecord),limelight:draft.limelight?compactRecord(draft.limelight):null};
 const payload={expected_version:draftVersion,draft:compactDraft};
 const bytes=new TextEncoder().encode(JSON.stringify(payload)).length;
-if(bytes>16384)throw Error("Draft is "+Math.ceil(bytes/1024)+" KB; the deployed Cloudflare Worker only accepts 16 KB. Download a backup before changing anything. The Worker needs its request limit increased.");
+if(bytes>100000)throw Error("Draft exceeds the 100 KB request limit. Download a backup before changing anything.");
 const response=await adminApi("/admin/draft?starts_on="+encodeURIComponent($("start").value),"PUT",payload);
     draftVersion=response.version;$("status").textContent="Saved to Cloudflare · version "+draftVersion+".";
   }catch(e){$("status").textContent="Not saved: "+e.message}
